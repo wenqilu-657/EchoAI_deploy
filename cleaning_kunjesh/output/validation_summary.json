@@ -1,0 +1,13 @@
+{
+  "source_url": "https://api.listenbrainz.org/1/user/hwnrwx/listens?count=50",
+  "source_user": "hwnrwx",
+  "source_count": 50,
+  "starting_rows": 50,
+  "final_rows": 50,
+  "exact_duplicates_removed": 0,
+  "excluded_from_metrics": 0,
+  "metric_rows": 50,
+  "metric_artists": 18,
+  "metric_months": 1,
+  "raw_sha256": "04507f491c3a7c2cc3321da8b0476e23227345058836d8d39fbc05ab19708ac6"
+}
