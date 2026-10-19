@@ -8,6 +8,7 @@ Data folder: $DSO576_DATA, default ~/dso576_data/clean
 Self-check against the real data: python backend/analysis.py
 """
 import os
+import threading
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -25,10 +26,18 @@ def _col(m):
     return f"listeners_{m // 100}_{m % 100:02d}"
 
 
-@lru_cache(maxsize=1)
+_LOCK = threading.Lock()
+
+
 def _con():
+    with _LOCK:
+        return _con_once()
+
+
+@lru_cache(maxsize=1)
+def _con_once():
     con = duckdb.connect()
-    for t in ("artists_clean", "artist_month_clean", "user_artist_clean", "recording_month"):
+    for t in ("artists_clean", "artist_month_clean", "user_artist_clean", "recording_month", "users_flagged"):
         con.execute(f"CREATE VIEW {t} AS SELECT * FROM read_parquet('{DATA_DIR / t}.parquet')")
     b = " + ".join(_col(m) for m in BASELINE_MONTHS)
     r = " + ".join(_col(m) for m in RECENT_MONTHS)
@@ -45,14 +54,15 @@ def _con():
 
 
 def _df(sql, params=()):
-    return _con().execute(sql, list(params)).df()
+    # One cursor per call: DuckDB connections are not thread-safe, and the API serves requests in parallel.
+    return _con().cursor().execute(sql, list(params)).df()
 
 
 @lru_cache(maxsize=32)
 def thresholds(min_baseline=5, size_pct=0.90, growth_pct=0.90):
     """D8 cutoffs, computed over all artists with baseline >= min_baseline.
     Returns {'recent_cutoff': listeners/month, 'growth_cutoff': proportion, 'n_scored': artists}."""
-    row = _con().execute("""
+    row = _con().cursor().execute("""
         SELECT quantile_cont(recent, ?), quantile_cont(growth, ?), count(*)
         FROM artist_metrics WHERE baseline >= ?""", [size_pct, growth_pct, min_baseline]).fetchone()
     return {"recent_cutoff": row[0], "growth_cutoff": row[1], "n_scored": row[2]}
@@ -147,6 +157,26 @@ def country_options():
                   GROUP BY country ORDER BY artists DESC, country""")
 
 
+def data_summary():
+    """Headline facts quoted in BUILD_SPEC.md / DATA_DECISIONS.md, computed from the data (dict)."""
+    c = _con().cursor()
+    one = lambda q: c.execute(q).fetchone()
+    users, bots, bot_listens, all_listens = one("""
+        SELECT count(*), count(*) FILTER (WHERE excluded_bot),
+               sum(listens_total) FILTER (WHERE excluded_bot), sum(listens_total) FROM users_flagged""")
+    s = shortlist()
+    return {
+        "artists": one("SELECT count(*) FROM artists_clean")[0],
+        "artists_scored (baseline >= 5)": thresholds()["n_scored"],
+        "artist_credited_listens_clean": int(one("SELECT sum(listens) FROM artist_month_clean")[0]),
+        "users": users,
+        "users_excluded_as_bots": bots,
+        "share_of_listens_from_bots": round(bot_listens / all_listens, 3),
+        "shortlist_default": len(s),
+        "shortlist_share_without_genre": round(float(s.top_genres.isna().mean()), 3),
+    }
+
+
 def _check():
     """Runs every function on the real data and asserts it matches DATA_DECISIONS.md."""
     t0 = time.time()
@@ -182,6 +212,8 @@ def _check():
     tt = top_tracks(int(a.artist_id))
     assert len(tt) <= 5 and tt.recent.is_monotonic_decreasing
     assert len(artist_profile(int(a.artist_id))) == 1
+    for k, v in data_summary().items():
+        print(f"  {k}: {v:,}" if isinstance(v, int) else f"  {k}: {v}")
     print(f"ok: {len(s)} shortlisted, top = {a['name']} (+{a.growth:.0%}), "
           f"{len(f)} fans-also-play, {len(tt)} tracks, {time.time() - t0:.1f}s")
 

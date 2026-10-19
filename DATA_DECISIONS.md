@@ -33,6 +33,8 @@ Tony's and Kunjesh's single-user API samples validated the listen record format.
 
 ## 3. Checked coverage and edge cases (canonical run)
 
+The artist, user and shortlist figures below are recomputed live by `data_summary()` in `backend/analysis.py` (printed by `python backend/analysis.py`); the listen-pipeline counts come from `cleaning_log.csv` and `listen_month_log.csv`.
+
 | Item | Value |
 |---|---|
 | Listens in window → after dedup → credited to an artist | 249,645,377 → 244,794,323 → 232,640,849 |
@@ -49,6 +51,20 @@ Tony's and Kunjesh's single-user API samples validated the listen record format.
 - No listener age, gender, location, or playlist data exists in any source.
 - The genre filter covers only 18% of the default shortlist. "All genres" is the default.
 
-## 5. Rebuild
+## 5. Canonical tables
 
-See `extraction/` (scripts, run order, Python 3.13). Outputs are written to `~/dso576_data/clean/` and are not committed.
+All tables are in `~/dso576_data/clean/` (or `$DSO576_DATA`). Keys: `artist_id` = MusicBrainz internal artist row id (joins the first three tables); `artist_mbid` = MusicBrainz artist UUID (joins `recording_month`); `user_id` = ListenBrainz numeric user id, already pseudonymous.
+
+| File | One row = | Key | Rows | Decisions applied | SHA-256 (first 16) |
+|---|---|---|---|---|---|
+| `artists_clean.parquet` | artist with ≥ 1 clean listen; metadata + `listeners_2026_MM` / `listens_2026_MM` (missing month = 0) | `artist_id` | 610,423 | D1–D6, D10 | `b490622fd01415b6` |
+| `artist_month_clean.parquet` | artist × month with ≥ 1 clean listen: `listens`, `listeners` | `artist_id, month` | 2,016,298 | D1–D6 | `1b2f4f185c62b849` |
+| `user_artist_clean.parquet` | user × artist over Mar–Aug: `listens`, `months_active` | `user_id, artist_id` | 17,372,972 | D1–D6 | `60ecf64a8f161040` |
+| `recording_month.parquet` | recording × month: `listens`, distinct `listeners`, first credited `artist_mbid` | `recording_mbid, month` | 16,514,832 | D1, D5 only (see note) | `4571fb3a29ae08dd` |
+| `users_flagged.parquet` | user: listen totals, daily max, `excluded_bot` | `user_id` | 58,378 | D5 | `6a31c5cffd1bf350` |
+
+Note: `recording_month` (built by `extraction/scripts/recording_month.py`) excludes bots but not exact duplicates (≈2% of listens), special-purpose artists, or merged-MBID redirects, and credits only the first artist. Distinct `listeners` are unaffected by duplicates, so the dashboard ranks tracks by listeners.
+
+## 6. Rebuild and verify
+
+Rebuild with `extraction/README.md` (ListenBrainz Spark dump 2722 + MusicBrainz export 20260930-002222, about 3 hours). A teammate who receives a copy of the folder instead can verify it: row counts and SHA-256 prefixes must match the table above, and `python backend/analysis.py` must print `ok: 1131 shortlisted`.
