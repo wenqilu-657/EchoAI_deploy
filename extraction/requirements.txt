@@ -1,0 +1,8 @@
+# Python 3.13 (tested in the dso576 venv). pyarrow >= 20 is required: older
+# versions abort on the ListenBrainz Parquet metadata.
+pandas==3.0.5
+pyarrow==24.0.0
+numpy==2.5.1
+ipykernel==7.3.0
+nbconvert==7.16.6
+duckdb>=1.1

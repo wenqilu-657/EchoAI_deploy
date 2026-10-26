@@ -17,3 +17,9 @@ downloads/
 # Local operating-system files.
 .DS_Store
 Thumbs.db
+
+# Local Python virtual environment.
+.venv/
+
+# Python bytecode
+__pycache__/
