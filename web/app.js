@@ -1,8 +1,16 @@
 import { getOptions, getShortlist, getArtist, getTrend, getFans, getTracks } from "./api.js";
-import { renderScatter, renderMultiTrend, renderTrend, renderFans, generateSparklineSvg } from "./charts.js";
+import {
+  renderScatter,
+  renderMultiTrend,
+  renderTrend,
+  renderFans,
+  generateSparklineSvg,
+  setChartZoom,
+} from "./charts.js";
 
 // ---- Single App State ----
 const state = {
+  stage: "launchpad", // 'launchpad' | 'dashboard'
   filters: {
     search: "",
     status: "",
@@ -11,10 +19,18 @@ const state = {
     size_tier: "",
     sort_by: "growth_desc",
   },
+  sliders: {
+    min_release: "2023-01-01",
+    growth_pct: 0.90,
+    size_pct: 0.90,
+    min_baseline: 5,
+  },
   defaults: {},
   viewMode: "cards", // 'cards' | 'table'
   chartMode: "scatter", // 'scatter' | 'trajectories'
+  zoomMode: "auto", // 'auto' | 'emerging' | 'superstars' | 'velocity'
   scope: "emerging", // 'emerging' | 'all'
+  activeMission: "🌟 The Official Emerging Shortlist",
   rows: [],
   thresholds: null,
   selectedId: null,
@@ -38,21 +54,56 @@ const esc = (s) =>
   );
 const unk = (v) => (v == null || v === "" || v === "None" ? "Unknown" : esc(v));
 const f1 = (x) => (x == null || isNaN(x) ? "0.0" : Number(x).toFixed(1));
-const pct = (g) => (g == null || isNaN(g) ? "—" : `+${Math.round(g * 100)}%`);
+const pct = (x) => (x == null || isNaN(x) ? "+0%" : `+${Math.round(x * 100)}%`);
 
+// Table Column Definitions
 const COLS = [
-  ["name", "Artist", 0],
-  ["artist_status", "Status", 0],
-  ["country", "Market", 0],
-  ["top_genres", "Genre", 0],
-  ["sparkline", "6-Mo Trend", 0],
-  ["baseline", "Baseline/mo", 1],
-  ["recent", "Recent/mo", 1],
-  ["growth", "Growth Velocity", 1],
-  ["soundalike_name", "Top Benchmark Match", 0],
+  ["name", "Artist", false],
+  ["status", "Category", false],
+  ["country", "Market", false],
+  ["top_genres", "Genre", false],
+  ["trend", "6M Trend", false],
+  ["baseline", "Mar '26", true],
+  ["recent", "Aug '26", true],
+  ["growth", "Growth", true],
+  ["soundalike_name", "Audience Overlap", false],
 ];
 
-// ---- Tray LocalStorage Persistence ----
+// ---- Stage Switching (Curator User Flow) ----
+function switchStage(stageName) {
+  state.stage = stageName;
+  const launchpad = $("stage-launchpad");
+  const dashboard = $("stage-dashboard");
+
+  if (stageName === "dashboard") {
+    if (launchpad) {
+      launchpad.hidden = true;
+      launchpad.style.display = "none";
+    }
+    if (dashboard) {
+      dashboard.hidden = false;
+      dashboard.style.display = "block";
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (state.rows.length === 0) {
+      loadList();
+    } else {
+      drawMainChart();
+    }
+  } else {
+    if (dashboard) {
+      dashboard.hidden = true;
+      dashboard.style.display = "none";
+    }
+    if (launchpad) {
+      launchpad.hidden = false;
+      launchpad.style.display = "block";
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+// ---- Storage: Shortlist Tray ----
 function loadTrayFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -75,11 +126,12 @@ function saveTrayToStorage() {
 // ---- Query Builder ----
 function buildQuery() {
   const f = state.filters;
+  const s = state.sliders;
   const q = {
-    min_release: "2023-01-01",
-    min_baseline: 5,
-    size_pct: 0.90,
-    growth_pct: 0.90,
+    min_release: s.min_release || "2023-01-01",
+    min_baseline: s.min_baseline != null ? s.min_baseline : 5,
+    size_pct: s.size_pct != null ? s.size_pct : 0.90,
+    growth_pct: s.growth_pct != null ? s.growth_pct : 0.90,
     scope: state.scope,
     sort_by: f.sort_by || "growth_desc",
   };
@@ -95,22 +147,45 @@ function buildQuery() {
 
 function syncFilterInputs() {
   const f = state.filters;
-  $("f-search").value = f.search || "";
-  $("f-status").value = f.status || "";
-  $("f-genre").value = f.genre || "";
-  $("f-country").value = f.country || "";
-  $("f-tier").value = f.size_tier || "";
-  $("f-sort").value = f.sort_by || "growth_desc";
+  if ($("f-search")) $("f-search").value = f.search || "";
+  if ($("f-status")) $("f-status").value = f.status || "";
+  if ($("f-genre")) $("f-genre").value = f.genre || "";
+  if ($("f-country")) $("f-country").value = f.country || "";
+  if ($("f-tier")) $("f-tier").value = f.size_tier || "";
+  if ($("f-sort")) $("f-sort").value = f.sort_by || "growth_desc";
+}
+
+function syncSliderInputs() {
+  const s = state.sliders;
+  if ($("slider-release-year") && s.min_release) {
+    const yr = s.min_release.split("-")[0];
+    $("slider-release-year").value = yr;
+    $("val-release-year").textContent = `Debuted ≥ Jan 1, ${yr}`;
+  }
+  if ($("slider-growth-pct") && s.growth_pct != null) {
+    const pctVal = Math.round(s.growth_pct * 100);
+    $("slider-growth-pct").value = pctVal;
+    $("val-growth-pct").textContent = `≥ ${pctVal}th Pct`;
+  }
+  if ($("slider-size-pct") && s.size_pct != null) {
+    const pctVal = Math.round(s.size_pct * 100);
+    $("slider-size-pct").value = pctVal;
+    $("val-size-pct").textContent = `≤ ${pctVal}th Pct Size`;
+  }
+  if ($("slider-baseline") && s.min_baseline != null) {
+    $("slider-baseline").value = s.min_baseline;
+    $("val-baseline").textContent = `≥ ${s.min_baseline} Listeners`;
+  }
 }
 
 function readFilterInputs() {
   state.filters = {
-    search: $("f-search").value.trim(),
-    status: $("f-status").value || "",
-    genre: $("f-genre").value || "",
-    country: $("f-country").value || "",
-    size_tier: $("f-tier").value || "",
-    sort_by: $("f-sort").value || "growth_desc",
+    search: $("f-search") ? $("f-search").value.trim() : "",
+    status: $("f-status") ? $("f-status").value || "" : "",
+    genre: $("f-genre") ? $("f-genre").value || "" : "",
+    country: $("f-country") ? $("f-country").value || "" : "",
+    size_tier: $("f-tier") ? $("f-tier").value || "" : "",
+    sort_by: $("f-sort") ? $("f-sort").value || "growth_desc" : "growth_desc",
   };
 }
 
@@ -127,7 +202,7 @@ function onFilterChange() {
 async function loadList() {
   const seq = ++listSeq;
   $("list-msg").style.display = "block";
-  $("list-msg").innerHTML = '<div>Scanning database…</div>';
+  $("list-msg").innerHTML = "<div>Scanning database…</div>";
 
   try {
     const res = await getShortlist(buildQuery());
@@ -151,7 +226,7 @@ async function loadList() {
       $("kpi-count-label").textContent = "Artists Found";
     } else if (state.filters.status === "emerging" || state.scope === "emerging") {
       $("results-heading").textContent = "Qualifying Emerging Artists";
-      $("kpi-count-label").textContent = "Qualifying Emerging";
+      $("kpi-count-label").textContent = "Qualifying Emerging Acts";
     } else if (state.filters.status === "established") {
       $("results-heading").textContent = "Established Mainstream Benchmarks";
       $("kpi-count-label").textContent = "Benchmark Superstars";
@@ -165,11 +240,12 @@ async function loadList() {
     if (seq !== listSeq) return;
     $("cards-view").innerHTML = "";
     $("table-view").hidden = true;
+    $("table-view").style.display = "none";
     $("list-msg").style.display = "block";
     $("list-msg").innerHTML = `
       <div style="color:var(--text-secondary);">
-        Unable to connect to database. 
-        <button type="button" class="btn-ghost" id="btn-retry-list" style="margin-left:8px;">Retry</button>
+        Failed to fetch artists. Please ensure backend is running.
+        <br><button type="button" id="btn-retry-list" class="btn-secondary" style="margin-top:10px;">Retry</button>
       </div>`;
     $("btn-retry-list")?.addEventListener("click", loadList);
   }
@@ -182,11 +258,14 @@ function drawList() {
   $("list-msg").style.display = empty ? "block" : "none";
   if (empty) {
     $("cards-view").innerHTML = "";
+    $("cards-view").style.display = "none";
+    $("cards-view").hidden = true;
     $("table-view").hidden = true;
+    $("table-view").style.display = "none";
     $("list-msg").innerHTML = `
       <div style="padding: 24px; color:var(--text-secondary);">
         <b>No artists matched your filter criteria.</b><br>
-        Try clearing search keywords or click <b>"Reset"</b>.
+        Try loosening threshold sliders, clearing search keywords, or clicking <b>"Reset"</b>.
       </div>`;
     $("results-counter").textContent = "0 artists found";
     drawMainChart();
@@ -197,13 +276,22 @@ function drawList() {
 
   drawMainChart();
 
+  // Robust View Switching
   if (state.viewMode === "cards") {
+    $("btn-view-cards").classList.add("active");
+    $("btn-view-table").classList.remove("active");
     $("cards-view").hidden = false;
+    $("cards-view").style.display = "grid";
     $("table-view").hidden = true;
+    $("table-view").style.display = "none";
     drawCards();
   } else {
+    $("btn-view-table").classList.add("active");
+    $("btn-view-cards").classList.remove("active");
     $("cards-view").hidden = true;
+    $("cards-view").style.display = "none";
     $("table-view").hidden = false;
+    $("table-view").style.display = "block";
     drawTable();
   }
 
@@ -226,7 +314,8 @@ function drawMainChart() {
       state.thresholds,
       state.selectedId,
       selectArtist,
-      mainChart
+      mainChart,
+      state.zoomMode
     );
   } else {
     mainChart = renderMultiTrend(
@@ -261,44 +350,51 @@ function drawCards() {
 
   $("cards-view").innerHTML = slice
     .map((a) => {
-      const sparkSvg = generateSparklineSvg(getSparklineValues(a), 90, 24);
+      const sparkSvg = generateSparklineSvg(getSparklineValues(a), 110, 24);
       const isSelected = a.artist_id === state.selectedId;
 
-      const statusBadge = a.is_emerging
-        ? '<span class="status-pill emerging">🌟 Emerging</span>'
+      const soundText = a.soundalike_name
+        ? `<div class="card-soundalike">Fans also listen to: <b>${esc(a.soundalike_name)}</b> (${Math.round((a.soundalike_share || 0) * 100)}%)</div>`
+        : "";
+
+      const statusPill = a.is_emerging
+        ? '<span class="status-pill emerging">🌟 Emerging Act</span>'
         : a.artist_status === "established"
         ? '<span class="status-pill established">👑 Benchmark</span>'
-        : '<span class="status-pill candidate">📈 Candidate</span>';
-
-      const soundalikeText = a.soundalike_name
-        ? `🎧 Benchmark overlap: <b>${esc(a.soundalike_name)}</b> (${Math.round((a.soundalike_share || 0) * 100)}%)`
-        : "🎧 Independent sound community";
+        : '<span class="status-pill candidate">Candidate</span>';
 
       return `
       <div class="artist-card ${isSelected ? "selected" : ""}" data-id="${a.artist_id}">
-        <div class="card-header">
-          <div>
-            <h3 class="card-artist-name">${esc(a.name)}</h3>
-            <div class="card-meta-line">${unk(a.country)} · Debut: ${esc((a.first_release_date || "").slice(0, 4))}</div>
+        <div>
+          <div class="card-top-row">
+            <span class="card-artist-name">${esc(a.name)}</span>
+            ${statusPill}
           </div>
-          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-            <span class="status-pill emerging" style="font-size:12px;">${pct(a.growth)}</span>
-            ${statusBadge}
+          <div class="card-genre-row">
+            ${unk(a.top_genres)} · ${unk(a.country)}
           </div>
-        </div>
 
-        <div class="card-telemetry-row">
-          <div class="card-metric-block">
-            <span class="card-recent-val">${f1(a.recent)} <small style="font-size:11px;color:var(--text-tertiary);">listeners/mo</small></span>
-            <span class="card-base-val">Baseline: ${f1(a.baseline)}/mo</span>
+          <div class="card-metrics-grid">
+            <div class="card-metric-cell">
+              <span class="card-metric-label">Mar '26</span>
+              <span class="card-metric-val">${f1(a.baseline)}</span>
+            </div>
+            <div class="card-metric-cell">
+              <span class="card-metric-label">Aug '26</span>
+              <span class="card-metric-val">${f1(a.recent)}</span>
+            </div>
+            <div class="card-metric-cell">
+              <span class="card-metric-label">6M Growth</span>
+              <span class="card-metric-val growth-highlight">${pct(a.growth)}</span>
+            </div>
           </div>
-          <div title="6-Month Monthly Listener Trajectory">
+
+          <div style="margin: 12px 0 6px 0;">
+            <span style="font-size:11px; color:var(--text-tertiary); display:block; margin-bottom:4px;">Monthly Trajectory</span>
             ${sparkSvg}
           </div>
-        </div>
 
-        <div class="card-soundalike-line">
-          ${soundalikeText}
+          ${soundText}
         </div>
 
         <div class="card-actions-row">
@@ -378,6 +474,20 @@ function selectArtist(artistId) {
   state.selectedId = artistId;
   highlightSelected(artistId);
   loadSpotlight(artistId);
+
+  // Update floating chart inspector
+  const artist = state.rows.find((r) => r.artist_id === artistId);
+  if (artist && $("chart-inspector")) {
+    $("chart-inspector").style.display = "flex";
+    $("ins-name").textContent = artist.name;
+    const statusText = artist.is_emerging
+      ? "🌟 Emerging"
+      : artist.artist_status === "established"
+      ? "👑 Benchmark"
+      : "Candidate";
+    $("ins-meta").textContent = `${statusText} · ${unk(artist.top_genres)} · ${unk(artist.country)} · Recent: ${Math.round(artist.recent)}/mo · Growth: +${Math.round((artist.growth || 0) * 100)}%`;
+    $("btn-ins-add").dataset.cardAdd = artist.artist_id;
+  }
 }
 
 function highlightSelected(artistId) {
@@ -398,139 +508,84 @@ async function loadSpotlight(artistId) {
 
   $("d-name").textContent = "Loading…";
   $("d-meta").innerHTML = "";
+  $("d-narrative").innerHTML = "Analyzing telemetry…";
   $("d-badge").innerHTML = "";
-  $("d-narrative").innerHTML = '<span style="color:var(--text-tertiary);">Loading artist briefing…</span>';
-  $("d-fans").innerHTML = '<div class="overlap-item" style="color:var(--text-tertiary);">Loading soundalikes…</div>';
-  $("d-tracks").innerHTML = '<div class="track-item" style="color:var(--text-tertiary);">Loading tracks…</div>';
 
-  if (trendChart) {
-    trendChart.destroy();
-    trendChart = null;
-  }
-
-  loadProfileAndMemo(artistId);
-  loadTrendChart(artistId);
-  loadTasteCommunity(artistId);
-  loadTopTracks(artistId);
-}
-
-async function loadProfileAndMemo(artistId) {
   try {
-    const a = await getArtist(artistId);
-    detailArtist = a;
+    const [artist, trendData, fansData, tracksData] = await Promise.all([
+      getArtist(artistId),
+      getTrend(artistId),
+      getFans(artistId, 5),
+      getTracks(artistId, 5),
+    ]);
 
-    $("d-avatar").textContent = (a.name || "?").charAt(0).toUpperCase();
-    $("d-name").textContent = a.name;
+    detailArtist = artist;
 
-    const mbidLink = a.artist_mbid
-      ? `<a href="https://musicbrainz.org/artist/${esc(a.artist_mbid)}" target="_blank" rel="noopener">MusicBrainz Profile ↗</a>`
+    $("d-name").textContent = artist.name;
+    $("d-avatar").textContent = (artist.name || "A").slice(0, 1).toUpperCase();
+
+    const relDate = artist.first_release_date ? artist.first_release_date.slice(0, 10) : "Unknown";
+    $("d-meta").textContent = `${unk(artist.artist_type)} · ${unk(artist.country)} · Debuted: ${relDate}`;
+
+    // Status Badge
+    if (artist.is_emerging) {
+      $("d-badge").innerHTML = '<span class="status-pill emerging">🌟 Verified Emerging Act (90th Pct Growth)</span>';
+    } else if (artist.artist_status === "established") {
+      $("d-badge").innerHTML = '<span class="status-pill established">👑 Mainstream Benchmark Act</span>';
+    } else {
+      $("d-badge").innerHTML = '<span class="status-pill candidate">Developing Talent Candidate</span>';
+    }
+
+    // Editorial narrative
+    const pctG = Math.round((artist.growth || 0) * 100);
+    const soundMsg = artist.soundalike_name
+      ? `Their audience heavily overlaps with listeners of <b>${esc(artist.soundalike_name)}</b>.`
       : "";
 
-    $("d-meta").innerHTML = `
-      <span>${unk(a.artist_type || "Act")}</span> · 
-      <span>${unk(a.country)}</span> · 
-      <span>Catalogued: ${esc(a.first_release_date)}</span> · 
-      ${mbidLink}
-    `;
-
-    // AUDIT-01 Warning Badge if scrobbles precede catalogued release date
-    if (a.listened_before_catalogued) {
-      $("d-badge").innerHTML = `
-        <div style="background:var(--accent-star-dim); border:1px solid var(--accent-star-border); border-radius:var(--radius-sm); padding:8px 12px; font-size:12px; color:var(--accent-star);">
-          ⚠️ <b>Debut Discrepancy (AUDIT-01):</b> ListenBrainz recorded active scrobbles prior to this artist's first catalogued release date.
-        </div>
-      `;
-    } else {
-      $("d-badge").innerHTML = "";
-    }
-
-    // Dynamic Summary Note
-    const soundText = a.soundalike_name
-      ? `Highest audience overlap with <b>${esc(a.soundalike_name)}</b> (${Math.round((a.soundalike_share || 0) * 100)}% of scrobblers also play ${esc(a.soundalike_name)}).`
-      : "Developing an independent community of listeners.";
-
     $("d-narrative").innerHTML = `
-      <b>${esc(a.name)}</b> surged <b>${pct(a.growth)}</b> from an average baseline of ${f1(a.baseline)} to ${f1(a.recent)} monthly scrobblers (+${Math.round(a.net_listeners || 0)} net listeners). ${soundText}
+      <b>${esc(artist.name)}</b> grew their listener base by <b>+${pctG}%</b> between March and August 2026, scaling from <b>${f1(artist.baseline)}</b> to <b>${f1(artist.recent)}</b> distinct monthly scrobblers. ${soundMsg}
     `;
-  } catch (e) {
-    $("d-name").textContent = "Error loading artist";
-    $("d-narrative").innerHTML = '<div style="color:var(--text-tertiary);">Could not load artist profile.</div>';
+
+    // 6-Month Trajectory Chart
+    trendChart = renderTrend($("trend"), trendData, trendChart);
+
+    // Fans Also Listen To
+    renderFans($("d-fans"), fansData);
+
+    // Top Songs
+    $("d-tracks").innerHTML =
+      tracksData.length === 0
+        ? '<div style="color:var(--text-secondary); font-size:12px;">No top recording data available.</div>'
+        : tracksData
+            .map(
+              (t, i) => `
+          <div class="top-track-row">
+            <span class="track-rank">${i + 1}</span>
+            <div class="track-title-cell">
+              <span class="track-name">${esc(t.recording_title)}</span>
+              <span class="track-growth-tag">+${Math.round((t.track_growth || 0) * 100)}% spike</span>
+            </div>
+          </div>
+        `
+            )
+            .join("");
+  } catch (err) {
+    console.error("Failed to load spotlight:", err);
+    $("d-name").textContent = "Unable to load artist profile";
   }
 }
 
-async function loadTrendChart(artistId) {
-  try {
-    const trend = await getTrend(artistId);
-    $("trend").style.display = "block";
-    trendChart = renderTrend($("trend"), trend, trendChart);
-  } catch (e) {
-    console.warn("Could not load trend chart", e);
-  }
-}
-
-async function loadTasteCommunity(artistId) {
-  try {
-    const fans = await getFans(artistId, 5);
-    renderFans($("d-fans"), fans);
-  } catch (e) {
-    $("d-fans").innerHTML = '<div class="overlap-item" style="color:var(--text-tertiary);">Taste overlap data unavailable.</div>';
-  }
-}
-
-async function loadTopTracks(artistId) {
-  try {
-    const tracks = await getTracks(artistId, 3);
-    if (!tracks || tracks.length === 0) {
-      $("d-tracks").innerHTML = '<div class="track-item" style="color:var(--text-tertiary);">No recording scrobble data found.</div>';
-      return;
-    }
-
-    $("d-tracks").innerHTML = tracks
-      .map(
-        (t, idx) => `
-      <div class="track-item">
-        <a href="${esc(t.url)}" target="_blank" rel="noopener">
-          🎵 Track ${idx + 1} ↗
-        </a>
-        <span class="track-item-stats">
-          ${f1(t.recent)} recent / ${f1(t.baseline)} base /mo
-        </span>
-      </div>`
-      )
-      .join("");
-  } catch (e) {
-    $("d-tracks").innerHTML = '<div class="track-item" style="color:var(--text-tertiary);">Recording data unavailable.</div>';
-  }
-}
-
-// ---- Shortlist Tray & Curation Export ----
-async function addToTray(artist) {
-  if (!artist) return;
-
-  const existingIdx = state.tray.findIndex((item) => item.artist.artist_id === artist.artist_id);
-  if (existingIdx >= 0) return;
-
-  const trayItem = {
-    artist,
-    sounds_like: artist.soundalike_name || "—",
-  };
-
-  state.tray.push(trayItem);
-  saveTrayToStorage();
-  drawTray();
-
-  if (!trayItem.sounds_like || trayItem.sounds_like === "—") {
-    try {
-      const topFans = await getFans(artist.artist_id, 1);
-      trayItem.sounds_like = topFans[0]?.name ?? "—";
-      saveTrayToStorage();
-      drawTray();
-    } catch (e) {}
+// ---- Shortlist Tray Actions ----
+function addToTray(artist) {
+  if (!state.tray.some((x) => x.artist_id === artist.artist_id)) {
+    state.tray.push(artist);
+    saveTrayToStorage();
+    drawTray();
   }
 }
 
 function removeFromTray(artistId) {
-  state.tray = state.tray.filter((item) => item.artist.artist_id !== artistId);
+  state.tray = state.tray.filter((x) => x.artist_id !== artistId);
   saveTrayToStorage();
   drawTray();
 }
@@ -543,70 +598,42 @@ function clearTray() {
 
 function drawTray() {
   const count = state.tray.length;
-  $("tray-count").textContent = `${count} act${count === 1 ? "" : "s"} queued`;
+  $("tray-count").textContent = `${count} act${count === 1 ? "" : "s"} shortlisted`;
   $("export").disabled = count === 0;
 
   if (count === 0) {
-    $("tray-body").innerHTML =
-      '<span style="font-size:12px; color:var(--text-tertiary); padding-left:4px;">No acts queued. Click "+ Add to Shortlist" on any artist card.</span>';
+    $("tray-body").innerHTML = '<span style="color:var(--text-tertiary); font-size:12px;">No acts shortlisted yet. Click "+ Add" on any artist card.</span>';
     return;
   }
 
   $("tray-body").innerHTML = state.tray
     .map(
-      (item) => `
-    <div class="tray-chip">
-      <span><b>${esc(item.artist.name)}</b> (${pct(item.artist.growth)})</span>
-      <button type="button" class="tray-chip-remove" data-remove="${item.artist.artist_id}" title="Remove">✕</button>
-    </div>`
+      (a) => `
+      <div class="tray-chip">
+        <span>${esc(a.name)}</span>
+        <button type="button" class="tray-chip-remove" data-remove="${a.artist_id}">×</button>
+      </div>
+    `
     )
     .join("");
 }
 
-// Formula injection protection for CSV export
-const csvCell = (v, isText = false) => {
-  if (v == null) return "";
-  let s = String(v);
-  if (isText && /^[=+\-@\t\r]/.test(s)) {
-    s = "'" + s;
-  }
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
-
 function exportCsv() {
   if (state.tray.length === 0) return;
+  const headers = ["Artist ID", "Name", "Country", "Genres", "Baseline (Mar '26)", "Recent (Aug '26)", "Growth %", "Overlap Benchmark"];
+  const rows = state.tray.map((a) => [
+    a.artist_id,
+    `"${(a.name || "").replace(/"/g, '""')}"`,
+    `"${a.country || "Unknown"}"`,
+    `"${(a.top_genres || "").replace(/"/g, '""')}"`,
+    f1(a.baseline),
+    f1(a.recent),
+    pct(a.growth),
+    `"${(a.soundalike_name || "").replace(/"/g, '""')}"`,
+  ]);
 
-  const headers = [
-    "artist_mbid",
-    "name",
-    "market_country",
-    "first_catalogued_date",
-    "baseline_listeners_mo",
-    "recent_listeners_mo",
-    "net_listeners_gain",
-    "growth_percent",
-    "growth_ratio",
-    "top_benchmark_overlap",
-  ];
-
-  const rows = state.tray.map((t) => {
-    const a = t.artist;
-    return [
-      csvCell(a.artist_mbid),
-      csvCell(a.name, true),
-      csvCell(a.country, true),
-      csvCell(a.first_release_date),
-      csvCell(f1(a.baseline)),
-      csvCell(f1(a.recent)),
-      csvCell(Math.round(a.net_listeners || 0)),
-      csvCell(pct(a.growth), true),
-      csvCell(Number(a.growth || 0).toFixed(4)),
-      csvCell(t.sounds_like, true),
-    ].join(",");
-  });
-
-  const csvContent = [headers.join(","), ...rows].join("\n") + "\n";
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
@@ -621,6 +648,115 @@ function exportCsv() {
 document.addEventListener("click", (e) => {
   const t = e.target;
 
+  // Curator Portals Click (Stage 1 -> Stage 2 Transition)
+  const portal = t.closest(".portal-card[data-mission]");
+  if (portal) {
+    const mission = portal.dataset.mission;
+    if (mission === "rockets") {
+      state.scope = "emerging";
+      state.filters.status = "emerging";
+      state.filters.sort_by = "growth_desc";
+      state.sliders.growth_pct = 0.90;
+      state.activeMission = "🚀 Breakout Rockets (Fastest Growth)";
+    } else if (mission === "emerging") {
+      state.scope = "emerging";
+      state.filters.status = "emerging";
+      state.filters.sort_by = "growth_desc";
+      state.activeMission = "🌟 The Official Emerging Shortlist";
+    } else if (mission === "global") {
+      state.scope = "all";
+      state.filters.status = "";
+      state.filters.country = "GB";
+      state.filters.sort_by = "growth_desc";
+      state.activeMission = "🌍 Global Underground (International)";
+    } else if (mission === "all") {
+      state.scope = "all";
+      state.filters.status = "";
+      state.filters.sort_by = "listeners_desc";
+      state.activeMission = "🌐 Catalog & Benchmark Explorer (All 58 Acts)";
+    }
+
+    if ($("active-mission-pill")) {
+      $("active-mission-pill").textContent = `Curator Studio: ${state.activeMission}`;
+    }
+
+    $("btn-scope-emerging").classList.toggle("active", state.scope === "emerging");
+    $("btn-scope-all").classList.toggle("active", state.scope === "all");
+    syncFilterInputs();
+    syncSliderInputs();
+    switchStage("dashboard");
+    loadList();
+    return;
+  }
+
+  // Enter Studio Button
+  if (t.closest("#btn-enter-studio")) {
+    switchStage("dashboard");
+    return;
+  }
+
+  // Return to Hub Button
+  if (t.closest("#btn-back-hub")) {
+    switchStage("launchpad");
+    return;
+  }
+
+  // Quick Preview Card click
+  const previewCard = t.closest(".preview-act-card[data-preview-artist]");
+  if (previewCard) {
+    const artistId = +previewCard.dataset.previewArtist;
+    switchStage("dashboard");
+    selectArtist(artistId);
+    return;
+  }
+
+  // Quick studio jump tabs
+  if (t.closest("#tab-jump-chart")) {
+    $("section-visualizer")?.scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+  if (t.closest("#tab-jump-sliders")) {
+    const panel = $("tuning-content");
+    if (panel) panel.style.display = "grid";
+    $("tuning-panel")?.scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+  if (t.closest("#tab-jump-results")) {
+    $("main-workspace")?.scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+
+  // Tuning Panel Collapse/Expand
+  if (t.closest("#tuning-toggle-btn")) {
+    const content = $("tuning-content");
+    const icon = $("tuning-toggle-icon");
+    if (content) {
+      const isHidden = content.style.display === "none";
+      content.style.display = isHidden ? "grid" : "none";
+      if (icon) icon.textContent = isHidden ? "▼ Click to Collapse" : "▶ Click to Expand";
+    }
+    return;
+  }
+
+  // Interactive Chart Zoom Buttons
+  const zoomBtn = t.closest(".zoom-btn[data-zoom]");
+  if (zoomBtn) {
+    const mode = zoomBtn.dataset.zoom;
+    state.zoomMode = mode;
+    document.querySelectorAll(".zoom-btn").forEach((b) => b.classList.remove("active"));
+    zoomBtn.classList.add("active");
+    if (mainChart) {
+      setChartZoom(mainChart, mode);
+    }
+    return;
+  }
+
+  // Chart Inspector Spotlight action
+  if (t.closest("#btn-ins-spotlight")) {
+    $("spotlight-column")?.scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+
   // Catalog Scope Toggles (Emerging vs All)
   if (t.closest("#btn-scope-emerging")) {
     state.scope = "emerging";
@@ -628,7 +764,7 @@ document.addEventListener("click", (e) => {
     $("f-status").value = "emerging";
     $("btn-scope-emerging").classList.add("active");
     $("btn-scope-all").classList.remove("active");
-    $("scope-description").textContent = "Showing qualifying emerging acts meeting 90th percentile growth and size criteria.";
+    $("scope-description").textContent = "Showing qualifying emerging acts meeting 90th percentile growth and audience criteria.";
     state.page = 0;
     loadList();
     return;
@@ -646,19 +782,27 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  // View switchers
+  // Working View switchers
   if (t.closest("#btn-view-cards")) {
     state.viewMode = "cards";
     $("btn-view-cards").classList.add("active");
     $("btn-view-table").classList.remove("active");
-    drawList();
+    $("cards-view").hidden = false;
+    $("cards-view").style.display = "grid";
+    $("table-view").hidden = true;
+    $("table-view").style.display = "none";
+    drawCards();
     return;
   }
   if (t.closest("#btn-view-table")) {
     state.viewMode = "table";
     $("btn-view-table").classList.add("active");
     $("btn-view-cards").classList.remove("active");
-    drawList();
+    $("cards-view").hidden = true;
+    $("cards-view").style.display = "none";
+    $("table-view").hidden = false;
+    $("table-view").style.display = "block";
+    drawTable();
     return;
   }
 
@@ -668,7 +812,7 @@ document.addEventListener("click", (e) => {
     $("btn-chart-scatter").classList.add("active");
     $("btn-chart-trajectories").classList.remove("active");
     $("chart-heading").textContent = "Audience Scale vs. Growth Velocity Map";
-    $("chart-sub").textContent = "Visualizing artists along monthly listener scale (X) and 6-month growth velocity (Y)";
+    $("chart-sub").textContent = "Visualizing artists along monthly listener scale (X) and 6-month growth velocity (Y). Click any dot to inspect.";
     drawMainChart();
     return;
   }
@@ -683,7 +827,7 @@ document.addEventListener("click", (e) => {
   }
 
   // Data & Cleaning Modal
-  if (t.closest("#btn-open-cleaning")) {
+  if (t.closest("#btn-open-cleaning") || t.closest("#btn-launch-cleaning")) {
     $("modal-cleaning").style.display = "flex";
     return;
   }
@@ -781,12 +925,50 @@ async function init() {
     opt.countries.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
 
   syncFilterInputs();
+  syncSliderInputs();
 
   // Filter change listeners
   ["f-search", "f-status", "f-genre", "f-country", "f-tier", "f-sort"].forEach((id) => {
     $(id).addEventListener("input", onFilterChange);
     $(id).addEventListener("change", onFilterChange);
   });
+
+  // Slider change listeners
+  if ($("slider-release-year")) {
+    $("slider-release-year").addEventListener("input", (e) => {
+      const yr = e.target.value;
+      state.sliders.min_release = `${yr}-01-01`;
+      $("val-release-year").textContent = `Debuted ≥ Jan 1, ${yr}`;
+      onFilterChange();
+    });
+  }
+
+  if ($("slider-growth-pct")) {
+    $("slider-growth-pct").addEventListener("input", (e) => {
+      const val = +e.target.value;
+      state.sliders.growth_pct = val / 100;
+      $("val-growth-pct").textContent = `≥ ${val}th Pct`;
+      onFilterChange();
+    });
+  }
+
+  if ($("slider-size-pct")) {
+    $("slider-size-pct").addEventListener("input", (e) => {
+      const val = +e.target.value;
+      state.sliders.size_pct = val / 100;
+      $("val-size-pct").textContent = `≤ ${val}th Pct Size`;
+      onFilterChange();
+    });
+  }
+
+  if ($("slider-baseline")) {
+    $("slider-baseline").addEventListener("input", (e) => {
+      const val = +e.target.value;
+      state.sliders.min_baseline = val;
+      $("val-baseline").textContent = `≥ ${val} Listeners`;
+      onFilterChange();
+    });
+  }
 
   $("f-reset").addEventListener("click", () => {
     state.scope = "emerging";
@@ -798,9 +980,16 @@ async function init() {
       size_tier: "",
       sort_by: "growth_desc",
     };
+    state.sliders = {
+      min_release: "2023-01-01",
+      growth_pct: 0.90,
+      size_pct: 0.90,
+      min_baseline: 5,
+    };
     $("btn-scope-emerging").classList.add("active");
     $("btn-scope-all").classList.remove("active");
     syncFilterInputs();
+    syncSliderInputs();
     state.page = 0;
     loadList();
   });
@@ -808,6 +997,7 @@ async function init() {
   $("export").addEventListener("click", exportCsv);
   $("tray-clear").addEventListener("click", clearTray);
 
+  // Initial load: keep on launchpad stage by default, but populate list in background
   await loadList();
 }
 

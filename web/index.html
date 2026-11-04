@@ -39,226 +39,478 @@
       </div>
     </header>
 
-    <!-- Scope Switcher: Emerging vs All Artists -->
-    <div class="scope-toggle-bar">
-      <div class="scope-button-group">
-        <button type="button" class="scope-btn active" id="btn-scope-emerging">
-          <span>🌟 Emerging Shortlist</span>
-          <span class="scope-badge-count" id="scope-count-emerging">6</span>
-        </button>
-        <button type="button" class="scope-btn" id="btn-scope-all">
-          <span>🌐 All Artists in Database</span>
-          <span class="scope-badge-count" id="scope-count-all">58</span>
-        </button>
-      </div>
-      <div style="font-size:12px; color:var(--text-secondary);" id="scope-description">
-        Showing qualifying emerging acts meeting 90th percentile growth and audience criteria.
-      </div>
-    </div>
-
-    <!-- Overview Metric Strip -->
-    <section class="overview-grid section-spacer">
-      <div class="metric-card">
-        <span class="metric-label" id="kpi-count-label">Qualifying Artists</span>
-        <span id="kpi-count" class="metric-value accent">Loading…</span>
-        <span class="metric-sub" id="kpi-sample-note">Local evaluation sample (58 scored)</span>
-      </div>
-      <div class="metric-card">
-        <span class="metric-label">Audience Limit (90th %)</span>
-        <span id="kpi-size" class="metric-value">Loading…</span>
-        <span class="metric-sub">Ceiling excluding established superstars</span>
-      </div>
-      <div class="metric-card">
-        <span class="metric-label">Min Growth Rate (90th %)</span>
-        <span id="kpi-growth" class="metric-value accent">Loading…</span>
-        <span class="metric-sub">6-month listener gain floor</span>
-      </div>
-      <div class="metric-card">
-        <span class="metric-label">Top Benchmark Match</span>
-        <span id="kpi-anchor" class="metric-value">BTS (89%)</span>
-        <span class="metric-sub">Co-listening audience overlap</span>
-      </div>
-    </section>
-
-    <!-- Interactive Visualizer Panel -->
-    <section class="visualizer-panel section-spacer">
-      <div class="visualizer-header">
-        <div class="visualizer-title">
-          <h2 id="chart-heading">Audience Scale vs. Growth Velocity Map</h2>
-          <p id="chart-sub">Visualizing artists along monthly listener scale (X) and 6-month growth velocity (Y)</p>
+    <!-- ====================================================================
+         STAGE 1: Welcome & Curator Launchpad (Curator Mission Control)
+         ==================================================================== -->
+    <section id="stage-launchpad" class="stage-view">
+      <div class="launchpad-hero">
+        <div class="launchpad-pill">
+          <span>⚡</span>
+          <span>USC MSBA DSO 576 · ListenBrainz Telemetry Engine</span>
         </div>
-        <div class="chart-toggle-group">
-          <button type="button" class="chart-tab-btn active" id="btn-chart-scatter">Distribution Map</button>
-          <button type="button" class="chart-tab-btn" id="btn-chart-trajectories">6-Month Trajectories</button>
-        </div>
-      </div>
-      <div class="chart-canvas-box" id="scatter-wrap">
-        <canvas id="scatter"></canvas>
-      </div>
-    </section>
+        <h1 class="launchpad-title">
+          Find Tomorrow's Headliners Before Mainstream Algorithms
+        </h1>
+        <p class="launchpad-desc">
+          Leveraging 6 months of ListenBrainz scrobbles (March–August 2026) joined with MusicBrainz catalog release dates to uncover breakout independent artists with small audiences and exponential listener velocity.
+        </p>
 
-    <!-- Meaningful Curator Filter Bar (No Jargon) -->
-    <section class="filters-panel section-spacer">
-      <div class="filters-controls-grid">
-        <!-- Search -->
-        <div class="input-group">
-          <label for="f-search">Search Artist / Keyword</label>
-          <input id="f-search" class="input-control" type="text" placeholder="e.g. EVAN, Taylor, BTS, Rock...">
+        <div class="launchpad-stats-row">
+          <div class="launchpad-stat-chip">Catalog: <b>58 Artists</b></div>
+          <div class="launchpad-stat-chip">Qualified Breakouts: <b>6 Emerging Acts</b></div>
+          <div class="launchpad-stat-chip">Observation Window: <b>6 Months Telemetry</b></div>
+          <div class="launchpad-stat-chip">Analytics: <b>100% Deterministic Code</b></div>
         </div>
 
-        <!-- Category / Status -->
-        <div class="input-group">
-          <label for="f-status">Artist Category</label>
-          <select id="f-status" class="input-control">
-            <option value="">All Categories</option>
-            <option value="emerging">🌟 Emerging Acts</option>
-            <option value="established">👑 Mainstream Benchmarks</option>
-            <option value="candidate">📈 Developing Candidates</option>
-          </select>
+        <div class="launchpad-cta-row">
+          <button type="button" class="btn-hero-primary" id="btn-enter-studio">
+            <span>🚀 Enter Discovery Studio</span>
+            <span>→</span>
+          </button>
+          <button type="button" class="btn-ghost" id="btn-launch-cleaning">
+            <span>Data & Cleaning Methodology</span>
+          </button>
         </div>
-
-        <!-- Genre -->
-        <div class="input-group">
-          <label for="f-genre">Genre / Style</label>
-          <select id="f-genre" class="input-control">
-            <option value="">All Genres</option>
-          </select>
-        </div>
-
-        <!-- Market / Country -->
-        <div class="input-group">
-          <label for="f-country">Market / Country</label>
-          <select id="f-country" class="input-control">
-            <option value="">All Markets</option>
-          </select>
-        </div>
-
-        <!-- Audience Scale Tier -->
-        <div class="input-group">
-          <label for="f-tier">Audience Scale</label>
-          <select id="f-tier" class="input-control">
-            <option value="">All Sizes</option>
-            <option value="micro">Micro (&lt; 50/mo)</option>
-            <option value="developing">Rising (50–300/mo)</option>
-            <option value="mainstream">Mainstream (&gt; 300/mo)</option>
-          </select>
-        </div>
-
-        <!-- Sort By -->
-        <div class="input-group">
-          <label for="f-sort">Sort By</label>
-          <select id="f-sort" class="input-control">
-            <option value="growth_desc">⚡ Highest Growth</option>
-            <option value="listeners_desc">👥 Most Listeners</option>
-            <option value="listeners_asc">📉 Smallest Audience</option>
-            <option value="name_asc">🔤 Name (A–Z)</option>
-          </select>
-        </div>
-
-        <button type="button" id="f-reset" class="btn-ghost" title="Reset all filters">Reset</button>
       </div>
 
-      <!-- Hidden State Inputs -->
-      <div style="display:none;">
-        <select id="f-seed"><option value=""></option></select>
-        <select id="f-velocity"><option value=""></option></select>
-        <select id="f-year"><option value="2023">2023</option></select>
-        <input id="f-base" type="number" value="5">
-        <input id="f-size" type="range" value="90">
-        <input id="f-growth" type="range" value="90">
-      </div>
-    </section>
-
-    <!-- Main Workspace (Two-Column Discovery Layout) -->
-    <main class="workspace-grid section-spacer">
-      <!-- Left Column: Artist Results List -->
-      <section id="results-column">
-        <div class="column-header">
-          <div class="column-title">
-            <h2 id="results-heading">Qualifying Emerging Artists</h2>
-            <p id="results-counter">Scanning database…</p>
+      <!-- Curator Quick-Start Portals -->
+      <div class="portals-section-title">Select a Curatorial Discovery Mission</div>
+      <div class="curator-portals-grid">
+        <!-- Mission 1: Rocket Ships -->
+        <div class="portal-card" data-mission="rockets">
+          <div class="portal-card-top">
+            <span class="portal-icon">🚀</span>
+            <span class="portal-badge" style="color:#059669; background:rgba(5,150,105,0.08);">Fastest Growth</span>
           </div>
-          <div class="view-toggle-wrap">
-            <button type="button" id="btn-view-cards" class="view-btn active">Cards</button>
-            <button type="button" id="btn-view-table" class="view-btn">Table</button>
+          <h3 class="portal-title">Breakout Rockets</h3>
+          <p class="portal-desc">
+            Spot early-stage acts experiencing exponential listener acceleration (>500% gain) before their sound becomes saturated.
+          </p>
+          <div class="portal-meta-row">
+            <span class="portal-stat-text">Top Velocity · Debuted 2023+</span>
+            <span class="portal-action-link">Launch Mission →</span>
           </div>
         </div>
 
-        <!-- Global Status Messages -->
-        <div id="list-msg" style="display:none; padding: 24px; text-align: center; color: var(--text-secondary);"></div>
-
-        <!-- Cards View -->
-        <div id="cards-view" class="cards-container"></div>
-
-        <!-- Table View -->
-        <div id="table-view" class="table-panel" hidden>
-          <table id="table">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
+        <!-- Mission 2: Official Emerging Shortlist (Editorial Summary) -->
+        <div class="portal-card" data-mission="emerging">
+          <div class="portal-card-top">
+            <span class="portal-icon">🌟</span>
+            <span class="portal-badge" style="color:var(--accent-primary); background:var(--accent-primary-dim);">Editorial Summary</span>
+          </div>
+          <h3 class="portal-title">The Official Emerging Shortlist</h3>
+          <p class="portal-desc">
+            The 6 mathematically verified breakout artists who pass strict 90th percentile growth and audience size cutoffs.
+          </p>
+          <div class="portal-meta-row">
+            <span class="portal-stat-text">6 Acts Qualified · Avg +764%</span>
+            <span class="portal-action-link">Explore Shortlist →</span>
+          </div>
         </div>
 
-        <!-- Pager -->
-        <div id="pager" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; color: var(--text-secondary); font-size: 13px;"></div>
+        <!-- Mission 3: Global Underground -->
+        <div class="portal-card" data-mission="global">
+          <div class="portal-card-top">
+            <span class="portal-icon">🌍</span>
+            <span class="portal-badge" style="color:#7c3aed; background:rgba(124,58,237,0.08);">Cross-Border</span>
+          </div>
+          <h3 class="portal-title">Global Underground</h3>
+          <p class="portal-desc">
+            Uncover breakout independent artists emerging from international music markets outside the US (UK indie, Korea, Japan).
+          </p>
+          <div class="portal-meta-row">
+            <span class="portal-stat-text">International Acts · Non-US</span>
+            <span class="portal-action-link">Discover Global →</span>
+          </div>
+        </div>
+
+        <!-- Mission 4: Catalog & Benchmark Explorer -->
+        <div class="portal-card" data-mission="all">
+          <div class="portal-card-top">
+            <span class="portal-icon">🌐</span>
+            <span class="portal-badge" style="color:#0284c7; background:rgba(2,132,199,0.08);">Full Catalog</span>
+          </div>
+          <h3 class="portal-title">Catalog & Benchmark Explorer</h3>
+          <p class="portal-desc">
+            Benchmark emerging acts against global mainstream superstars like Taylor Swift, BTS, and Kendrick Lamar with full custom sliders.
+          </p>
+          <div class="portal-meta-row">
+            <span class="portal-stat-text">All 58 Artists Scored</span>
+            <span class="portal-action-link">Open Catalog →</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Breakout Preview Strip -->
+      <div class="preview-strip-panel">
+        <div class="preview-strip-header">
+          <div>
+            <h4 style="margin:0; font-size:14px; font-weight:700; color:var(--text-primary);">Trending Breakout Acts at a Glance</h4>
+            <span style="font-size:12px; color:var(--text-secondary);">Click any artist to inspect their 6-month growth trajectory directly in the studio</span>
+          </div>
+        </div>
+        <div class="preview-strip-grid" id="preview-acts-grid">
+          <!-- Dynamically populated or static fallbacks -->
+          <div class="preview-act-card" data-preview-artist="2041085">
+            <div class="preview-act-info">
+              <span class="preview-act-name">🌟 EVAN</span>
+              <span class="preview-act-sub">Pop · US · 119 listeners/mo</span>
+            </div>
+            <span class="preview-act-badge">+1456%</span>
+          </div>
+          <div class="preview-act-card" data-preview-artist="1563539">
+            <div class="preview-act-info">
+              <span class="preview-act-name">🌟 The Shindellas</span>
+              <span class="preview-act-sub">R&B / Soul · US · 111 listeners/mo</span>
+            </div>
+            <span class="preview-act-badge">+1038%</span>
+          </div>
+          <div class="preview-act-card" data-preview-artist="2209705">
+            <div class="preview-act-info">
+              <span class="preview-act-name">🌟 Young Posse</span>
+              <span class="preview-act-sub">K-Pop / Hip-Hop · KR · 111 listeners/mo</span>
+            </div>
+            <span class="preview-act-badge">+780%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         STAGE 2: The Interactive Discovery Studio (The Full Dashboard)
+         ==================================================================== -->
+    <section id="stage-dashboard" class="stage-view" hidden>
+      <!-- Studio Top Navigation Bar -->
+      <div class="studio-nav-bar">
+        <button type="button" class="btn-back-hub" id="btn-back-hub" title="Return to Discovery Hub">
+          <span>←</span>
+          <span>Return to Discovery Hub</span>
+        </button>
+
+        <span id="active-mission-pill" class="active-mission-pill">
+          Curator Studio: 🌟 Emerging Shortlist (6 Acts)
+        </span>
+
+        <div class="studio-quick-tabs">
+          <button type="button" class="studio-tab-btn" id="tab-jump-chart">📊 Map</button>
+          <button type="button" class="studio-tab-btn" id="tab-jump-sliders">🎛️ Sliders</button>
+          <button type="button" class="studio-tab-btn" id="tab-jump-results">🎴 List</button>
+        </div>
+      </div>
+
+      <!-- Scope Switcher: Emerging vs All Artists -->
+      <div class="scope-toggle-bar">
+        <div class="scope-button-group">
+          <button type="button" class="scope-btn active" id="btn-scope-emerging">
+            <span>🌟 Emerging Shortlist</span>
+            <span class="scope-badge-count" id="scope-count-emerging">6</span>
+          </button>
+          <button type="button" class="scope-btn" id="btn-scope-all">
+            <span>🌐 All Artists in Database</span>
+            <span class="scope-badge-count" id="scope-count-all">58</span>
+          </button>
+        </div>
+        <div style="font-size:12px; color:var(--text-secondary);" id="scope-description">
+          Showing qualifying emerging acts meeting 90th percentile growth and audience criteria.
+        </div>
+      </div>
+
+      <!-- Overview Metric Strip -->
+      <section class="overview-grid section-spacer">
+        <div class="metric-card">
+          <span class="metric-label" id="kpi-count-label">Qualifying Emerging Acts</span>
+          <span id="kpi-count" class="metric-value accent">Loading…</span>
+          <span class="metric-sub" id="kpi-sample-note">Local evaluation sample (58 scored)</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Audience Limit (90th %)</span>
+          <span id="kpi-size" class="metric-value">Loading…</span>
+          <span class="metric-sub">Ceiling excluding established superstars</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Min Growth Rate (90th %)</span>
+          <span id="kpi-growth" class="metric-value accent">Loading…</span>
+          <span class="metric-sub">6-month listener gain floor</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Top Benchmark Match</span>
+          <span id="kpi-anchor" class="metric-value">BTS (89%)</span>
+          <span class="metric-sub">Co-listening audience overlap</span>
+        </div>
       </section>
 
-      <!-- Right Column: Spotlight Artist Details -->
-      <aside id="spotlight-column">
-        <div class="spotlight-panel">
-          <div id="detail-empty" class="spotlight-empty">
-            <span class="spotlight-empty-icon">🎧</span>
-            <h3 style="margin:0 0 6px 0; color:var(--text-primary); font-size:16px;">Select an Artist</h3>
-            <p style="margin:0; font-size:13px;">Click on any artist card or table row to view their listener growth trajectory, audience overlap, and breakout tracks.</p>
+      <!-- Interactive Algorithm Tuning & Date Sliders Panel -->
+      <section class="tuning-panel section-spacer" id="tuning-panel">
+        <div class="tuning-header" id="tuning-toggle-btn">
+          <div class="tuning-title-wrap">
+            <span style="font-size:16px;">🎛️</span>
+            <h3 class="tuning-title">Interactive Algorithm Tuning & Date Sliders</h3>
+            <span class="tuning-badge">Real-Time Sliders</span>
+          </div>
+          <span class="tuning-toggle-icon" id="tuning-toggle-icon">▼ Click to Collapse</span>
+        </div>
+
+        <div class="tuning-grid" id="tuning-content">
+          <!-- Slider 1: Debut Release Year Slider -->
+          <div class="slider-group">
+            <div class="slider-label-row">
+              <span class="slider-label">Artist Debut Date</span>
+              <span class="slider-val-tag" id="val-release-year">Debuted ≥ Jan 1, 2023</span>
+            </div>
+            <input type="range" id="slider-release-year" class="slider-control" min="2015" max="2026" step="1" value="2023">
+            <div class="slider-scale-row">
+              <span>2015</span>
+              <span>2020</span>
+              <span>2023 (Default)</span>
+              <span>2026</span>
+            </div>
           </div>
 
-          <div id="detail-body" hidden>
-            <div class="spotlight-header">
-              <div class="artist-monogram" id="d-avatar">E</div>
-              <div class="spotlight-name-block">
-                <h2 id="d-name">EVAN</h2>
-                <div id="d-meta" class="spotlight-meta-block">Person · KR · Catalogued: 2024-05-10</div>
-              </div>
+          <!-- Slider 2: Growth Velocity Percentile Slider -->
+          <div class="slider-group">
+            <div class="slider-label-row">
+              <span class="slider-label">Growth Velocity Percentile</span>
+              <span class="slider-val-tag" id="val-growth-pct">≥ 90th Pct (Strict)</span>
             </div>
-
-            <!-- Optional Audit Notice Badge -->
-            <div id="d-badge" style="margin-bottom: 14px;"></div>
-
-            <!-- Curator Editorial Note -->
-            <div class="editorial-note-box">
-              <span style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-tertiary); margin-bottom:4px;">Editorial Summary</span>
-              <div id="d-narrative">Loading summary…</div>
+            <input type="range" id="slider-growth-pct" class="slider-control" min="50" max="99" step="5" value="90">
+            <div class="slider-scale-row">
+              <span>50% (Top Half)</span>
+              <span>75%</span>
+              <span>90% (Default)</span>
+              <span>99%</span>
             </div>
+          </div>
 
-            <!-- 6-Month Trajectory Chart -->
-            <div class="spotlight-section">
-              <div class="spotlight-section-title">6-Month Monthly Listener Trajectory</div>
-              <div class="spotlight-chart-box">
-                <canvas id="trend"></canvas>
-              </div>
+          <!-- Slider 3: Audience Ceiling Percentile Slider -->
+          <div class="slider-group">
+            <div class="slider-label-row">
+              <span class="slider-label">Audience Size Ceiling</span>
+              <span class="slider-val-tag" id="val-size-pct">≤ 90th Pct Size</span>
             </div>
-
-            <!-- Fans Also Listen To (Co-Listening Overlap) -->
-            <div class="spotlight-section">
-              <div class="spotlight-section-title">Fans Also Listen To (Co-Listening Overlap)</div>
-              <div id="d-fans" class="taste-overlap-list"></div>
+            <input type="range" id="slider-size-pct" class="slider-control" min="50" max="99" step="5" value="90">
+            <div class="slider-scale-row">
+              <span>50% (Micro)</span>
+              <span>75%</span>
+              <span>90% (Default)</span>
+              <span>99%</span>
             </div>
+          </div>
 
-            <!-- Top Recording Driver -->
-            <div class="spotlight-section">
-              <div class="spotlight-section-title">Lead Breakout Song</div>
-              <div id="d-tracks" class="top-tracks-list"></div>
+          <!-- Slider 4: Baseline Activity Gate Slider -->
+          <div class="slider-group">
+            <div class="slider-label-row">
+              <span class="slider-label">Min Baseline Listeners</span>
+              <span class="slider-val-tag" id="val-baseline">≥ 5 Listeners (Mar 2026)</span>
             </div>
-
-            <!-- Add to Shortlist Action -->
-            <div class="spotlight-action-row">
-              <button type="button" class="btn-primary-action" id="btn-add-detail">
-                + Add to Playlist Shortlist
-              </button>
+            <input type="range" id="slider-baseline" class="slider-control" min="1" max="25" step="1" value="5">
+            <div class="slider-scale-row">
+              <span>1</span>
+              <span>5 (Default)</span>
+              <span>15</span>
+              <span>25</span>
             </div>
           </div>
         </div>
-      </aside>
-    </main>
+      </section>
+
+      <!-- Interactive Visualizer Panel (Chart with Zoom & Inspector) -->
+      <section class="visualizer-panel section-spacer" id="section-visualizer">
+        <div class="visualizer-header">
+          <div class="visualizer-title">
+            <h2 id="chart-heading">Audience Scale vs. Growth Velocity Map</h2>
+            <p id="chart-sub">Visualizing artists along monthly listener scale (X) and 6-month growth velocity (Y). Click any dot to inspect.</p>
+          </div>
+          <div class="chart-toggle-group">
+            <button type="button" class="chart-tab-btn active" id="btn-chart-scatter">Distribution Map</button>
+            <button type="button" class="chart-tab-btn" id="btn-chart-trajectories">6-Month Trajectories</button>
+          </div>
+        </div>
+
+        <!-- Interactive Chart Controls: Zoom & Scale Presets -->
+        <div class="chart-controls-bar">
+          <div style="font-size:12px; color:var(--text-secondary); font-weight:600;">Interactive Chart Zoom & Bounds:</div>
+          <div class="chart-zoom-group">
+            <button type="button" class="zoom-btn active" id="btn-zoom-auto" data-zoom="auto">🔍 Auto Scale</button>
+            <button type="button" class="zoom-btn" id="btn-zoom-emerging" data-zoom="emerging">🎯 Focus Emerging (0–350)</button>
+            <button type="button" class="zoom-btn" id="btn-zoom-superstars" data-zoom="superstars">👑 Superstars View</button>
+            <button type="button" class="zoom-btn" id="btn-zoom-velocity" data-zoom="velocity">⚡ Top Growth (>500%)</button>
+          </div>
+        </div>
+
+        <!-- Floating Selected Artist Inspector Bar -->
+        <div id="chart-inspector" class="chart-inspector-bar" style="display:none;">
+          <div class="chart-inspector-info">
+            <span style="font-size:16px;">🎧</span>
+            <div>
+              <b id="ins-name" style="color:var(--text-primary); font-size:13px;">EVAN</b>
+              <span id="ins-meta" style="color:var(--text-secondary); margin-left:8px;">Pop · US · Recent: 119/mo · Growth: +1456%</span>
+            </div>
+          </div>
+          <div class="chart-inspector-actions">
+            <button type="button" class="btn-ghost" id="btn-ins-spotlight" style="padding:4px 10px; font-size:11px;">Inspect Dossier</button>
+            <button type="button" class="btn-card-shortlist" id="btn-ins-add" style="width:auto; padding:4px 10px; font-size:11px;">+ Shortlist</button>
+          </div>
+        </div>
+
+        <div class="chart-canvas-box" id="scatter-wrap">
+          <canvas id="scatter"></canvas>
+        </div>
+      </section>
+
+      <!-- Meaningful Curator Filter Bar (No Jargon) -->
+      <section class="filters-panel section-spacer">
+        <div class="filters-controls-grid">
+          <!-- Search -->
+          <div class="input-group">
+            <label for="f-search">Search Artist / Keyword</label>
+            <input id="f-search" class="input-control" type="text" placeholder="e.g. EVAN, Taylor, BTS, Rock...">
+          </div>
+
+          <!-- Category / Status -->
+          <div class="input-group">
+            <label for="f-status">Artist Category</label>
+            <select id="f-status" class="input-control">
+              <option value="">All Categories</option>
+              <option value="emerging">🌟 Emerging Acts</option>
+              <option value="established">👑 Mainstream Benchmarks</option>
+              <option value="candidate">📈 Developing Candidates</option>
+            </select>
+          </div>
+
+          <!-- Genre -->
+          <div class="input-group">
+            <label for="f-genre">Genre / Style</label>
+            <select id="f-genre" class="input-control">
+              <option value="">All Genres</option>
+            </select>
+          </div>
+
+          <!-- Market / Country -->
+          <div class="input-group">
+            <label for="f-country">Market / Country</label>
+            <select id="f-country" class="input-control">
+              <option value="">All Markets</option>
+            </select>
+          </div>
+
+          <!-- Audience Scale Tier -->
+          <div class="input-group">
+            <label for="f-tier">Audience Scale</label>
+            <select id="f-tier" class="input-control">
+              <option value="">All Sizes</option>
+              <option value="micro">Micro (&lt; 50/mo)</option>
+              <option value="developing">Rising (50–300/mo)</option>
+              <option value="mainstream">Mainstream (&gt; 300/mo)</option>
+            </select>
+          </div>
+
+          <!-- Sort By -->
+          <div class="input-group">
+            <label for="f-sort">Sort By</label>
+            <select id="f-sort" class="input-control">
+              <option value="growth_desc">⚡ Highest Growth</option>
+              <option value="listeners_desc">👥 Most Listeners</option>
+              <option value="listeners_asc">📉 Smallest Audience</option>
+              <option value="name_asc">🔤 Name (A–Z)</option>
+            </select>
+          </div>
+
+          <button type="button" id="f-reset" class="btn-ghost" title="Reset all filters">Reset</button>
+        </div>
+      </section>
+
+      <!-- Main Workspace (Two-Column Discovery Layout) -->
+      <main class="workspace-grid section-spacer" id="main-workspace">
+        <!-- Left Column: Artist Results List -->
+        <section id="results-column">
+          <div class="column-header">
+            <div class="column-title">
+              <h2 id="results-heading">Qualifying Emerging Artists</h2>
+              <p id="results-counter">Scanning database…</p>
+            </div>
+            <!-- Working View Toggle Wrap -->
+            <div class="view-toggle-wrap">
+              <button type="button" id="btn-view-cards" class="view-btn active">🎴 Cards Grid</button>
+              <button type="button" id="btn-view-table" class="view-btn">📋 Data Table</button>
+            </div>
+          </div>
+
+          <!-- Global Status Messages -->
+          <div id="list-msg" style="display:none; padding: 24px; text-align: center; color: var(--text-secondary);"></div>
+
+          <!-- Cards View -->
+          <div id="cards-view" class="cards-container"></div>
+
+          <!-- Table View -->
+          <div id="table-view" class="table-panel" hidden>
+            <table id="table">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <!-- Pager -->
+          <div id="pager" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center; color: var(--text-secondary); font-size: 13px;"></div>
+        </section>
+
+        <!-- Right Column: Spotlight Artist Details -->
+        <aside id="spotlight-column">
+          <div class="spotlight-panel">
+            <div id="detail-empty" class="spotlight-empty">
+              <span class="spotlight-empty-icon">🎧</span>
+              <h3 style="margin:0 0 6px 0; color:var(--text-primary); font-size:16px;">Select an Artist</h3>
+              <p style="margin:0; font-size:13px;">Click on any artist card, table row, or chart node to inspect their listener trajectory, co-listening taste community, and breakout tracks.</p>
+            </div>
+
+            <div id="detail-body" hidden>
+              <div class="spotlight-header">
+                <div class="artist-monogram" id="d-avatar">E</div>
+                <div class="spotlight-name-block">
+                  <h2 id="d-name">EVAN</h2>
+                  <div id="d-meta" class="spotlight-meta-block">Person · KR · Catalogued: 2024-05-10</div>
+                </div>
+              </div>
+
+              <!-- Optional Audit Notice Badge -->
+              <div id="d-badge" style="margin-bottom: 14px;"></div>
+
+              <!-- Curator Editorial Note -->
+              <div class="editorial-note-box">
+                <span style="display:block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-tertiary); margin-bottom:4px;">Editorial Summary</span>
+                <div id="d-narrative">Loading summary…</div>
+              </div>
+
+              <!-- 6-Month Trajectory Chart -->
+              <div class="spotlight-section">
+                <div class="spotlight-section-title">6-Month Monthly Listener Trajectory</div>
+                <div class="spotlight-chart-box">
+                  <canvas id="trend"></canvas>
+                </div>
+              </div>
+
+              <!-- Fans Also Listen To (Co-Listening Overlap) -->
+              <div class="spotlight-section">
+                <div class="spotlight-section-title">Fans Also Listen To (Co-Listening Overlap)</div>
+                <div id="d-fans" class="taste-overlap-list"></div>
+              </div>
+
+              <!-- Top Recording Driver -->
+              <div class="spotlight-section">
+                <div class="spotlight-section-title">Lead Breakout Song</div>
+                <div id="d-tracks" class="top-tracks-list"></div>
+              </div>
+
+              <!-- Add to Shortlist Action -->
+              <div class="spotlight-action-row">
+                <button type="button" class="btn-primary-action" id="btn-add-detail">
+                  + Add to Playlist Shortlist
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </main>
+    </section>
 
     <!-- Bottom Fixed Shortlist Tray -->
     <div class="tray-fixed">

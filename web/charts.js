@@ -110,7 +110,15 @@ const artistScatterLabelsPlugin = {
  * Renders the primary Growth vs. Audience Distribution Scatter Plot.
  * Uses clean linear scales, direct canvas artist labels, and benchmark lines.
  */
-export function renderScatter(canvas, rows = [], th = {}, selectedId = null, onSelect = null, oldChart = null) {
+export function renderScatter(
+  canvas,
+  rows = [],
+  th = {},
+  selectedId = null,
+  onSelect = null,
+  oldChart = null,
+  zoomPreset = "auto"
+) {
   if (oldChart) {
     oldChart.destroy();
   }
@@ -123,8 +131,24 @@ export function renderScatter(canvas, rows = [], th = {}, selectedId = null, onS
   const xs = rows.map((r) => r.recent || 0);
   const ys = rows.map((r) => (r.growth || 0) * 100);
 
-  const xmax = Math.max((th?.recent_cutoff || 100) * 1.15, Math.max(...xs) * 1.08, 100);
-  const ymax = Math.max((th?.growth_cutoff ? th.growth_cutoff * 100 : 100) * 1.1, Math.max(...ys) * 1.08, 200);
+  const rawXmax = Math.max((th?.recent_cutoff || 100) * 1.15, Math.max(...xs) * 1.08, 100);
+  const rawYmax = Math.max((th?.growth_cutoff ? th.growth_cutoff * 100 : 100) * 1.1, Math.max(...ys) * 1.08, 200);
+
+  let scaleXMin = 0;
+  let scaleXMax = Math.ceil(rawXmax / 50) * 50;
+  let scaleYMin = 0;
+  let scaleYMax = Math.ceil(rawYmax / 100) * 100;
+
+  if (zoomPreset === "emerging") {
+    scaleXMax = Math.min(scaleXMax, Math.max(350, Math.round((th?.recent_cutoff || 150) * 1.25)));
+    scaleYMax = Math.min(scaleYMax, 1600);
+  } else if (zoomPreset === "velocity") {
+    scaleYMin = 400;
+    scaleXMax = Math.min(scaleXMax, 400);
+  } else if (zoomPreset === "superstars") {
+    scaleXMin = 150;
+    scaleYMax = Math.min(scaleYMax, 400);
+  }
 
   // Background shaded target quadrant plugin
   const quadrantPlugin = {
@@ -140,7 +164,7 @@ export function renderScatter(canvas, rows = [], th = {}, selectedId = null, onS
       const qWidth = Math.max(0, Math.min(cutoffX, chartArea.right) - chartArea.left);
       const qHeight = Math.max(0, cutoffY - chartArea.top);
 
-      ctx.fillStyle = "rgba(245, 158, 11, 0.05)";
+      ctx.fillStyle = "rgba(37, 99, 235, 0.05)";
       ctx.fillRect(chartArea.left, chartArea.top, qWidth, qHeight);
 
       ctx.restore();
@@ -163,12 +187,13 @@ export function renderScatter(canvas, rows = [], th = {}, selectedId = null, onS
         if (d.isSelected) return accent;
         if (d.r.is_emerging) return accent;
         if (d.r.artist_status === "established") return "#38bdf8";
-        return "rgba(148, 163, 184, 0.6)";
+        return "rgba(148, 163, 184, 0.65)";
       }),
-      borderColor: pointsData.map((d) => (d.isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.2)")),
+      borderColor: pointsData.map((d) => (d.isSelected ? "#ffffff" : "rgba(255, 255, 255, 0.3)")),
       borderWidth: pointsData.map((d) => (d.isSelected ? 3 : 1)),
-      pointRadius: pointsData.map((d) => (d.isSelected ? 9 : d.r.is_emerging || d.r.recent > 300 ? 7 : 5)),
-      pointHoverRadius: 10,
+      pointRadius: pointsData.map((d) => (d.isSelected ? 11 : d.r.is_emerging || d.r.recent > 300 ? 7 : 5)),
+      pointHoverRadius: 13,
+      pointHitRadius: 22,
     },
   ];
 
@@ -179,13 +204,14 @@ export function renderScatter(canvas, rows = [], th = {}, selectedId = null, onS
       type: "line",
       showLine: true,
       data: [
-        { x: th.recent_cutoff, y: 0 },
-        { x: th.recent_cutoff, y: ymax },
+        { x: th.recent_cutoff, y: scaleYMin },
+        { x: th.recent_cutoff, y: scaleYMax },
       ],
-      borderColor: "rgba(245, 158, 11, 0.6)",
+      borderColor: "rgba(217, 119, 6, 0.7)",
       borderDash: [5, 5],
       borderWidth: 1.5,
       pointRadius: 0,
+      pointHitRadius: 0,
     });
   }
 
@@ -196,53 +222,57 @@ export function renderScatter(canvas, rows = [], th = {}, selectedId = null, onS
       type: "line",
       showLine: true,
       data: [
-        { x: 0, y: gVal },
-        { x: xmax, y: gVal },
+        { x: scaleXMin, y: gVal },
+        { x: scaleXMax, y: gVal },
       ],
-      borderColor: "rgba(245, 158, 11, 0.6)",
+      borderColor: "rgba(217, 119, 6, 0.7)",
       borderDash: [5, 5],
       borderWidth: 1.5,
       pointRadius: 0,
+      pointHitRadius: 0,
     });
   }
 
-  return new Chart(canvas, {
+  const chart = new Chart(canvas, {
     data: { datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: false,
+      animation: { duration: 250 },
+      onHover: (event, chartElement) => {
+        canvas.style.cursor = chartElement && chartElement.length ? "pointer" : "default";
+      },
       scales: {
         x: {
           type: "linear",
-          min: 0,
-          max: Math.ceil(xmax / 50) * 50,
-          grid: { color: "rgba(255, 255, 255, 0.05)" },
+          min: scaleXMin,
+          max: scaleXMax,
+          grid: { color: "rgba(148, 163, 184, 0.12)" },
           ticks: {
-            color: "#94a3b8",
+            color: "#64748b",
             font: { family: "Geist Mono, monospace", size: 11 },
           },
           title: {
             display: true,
             text: "Recent Monthly Listeners (Audience Scale)",
-            color: "#a3a8b4",
+            color: "#475569",
             font: { size: 11, weight: "600" },
           },
         },
         y: {
           type: "linear",
-          min: 0,
-          max: Math.ceil(ymax / 100) * 100,
-          grid: { color: "rgba(255, 255, 255, 0.05)" },
+          min: scaleYMin,
+          max: scaleYMax,
+          grid: { color: "rgba(148, 163, 184, 0.12)" },
           ticks: {
-            color: "#94a3b8",
+            color: "#64748b",
             font: { family: "Geist Mono, monospace", size: 11 },
             callback: (v) => `+${Math.round(v)}%`,
           },
           title: {
             display: true,
             text: "Listener Growth Velocity (%)",
-            color: "#a3a8b4",
+            color: "#475569",
             font: { size: 11, weight: "600" },
           },
         },
@@ -253,30 +283,37 @@ export function renderScatter(canvas, rows = [], th = {}, selectedId = null, onS
           position: "top",
           align: "end",
           labels: {
-            color: "#94a3b8",
+            color: "#64748b",
             font: { size: 11 },
             boxWidth: 12,
             boxHeight: 2,
           },
         },
         tooltip: {
-          backgroundColor: "#181c26",
+          backgroundColor: "rgba(15, 23, 42, 0.94)",
           borderColor: "rgba(255, 255, 255, 0.15)",
           borderWidth: 1,
           padding: 12,
           titleColor: "#f8fafc",
-          bodyColor: "#94a3b8",
+          bodyColor: "#cbd5e1",
+          cornerRadius: 8,
           callbacks: {
             title: (items) => items[0]?.raw?.r?.name || items[0]?.dataset?.label || "",
             label: (item) => {
               const r = item.raw.r;
               if (!r) return "";
-              const status = r.is_emerging ? "🌟 Emerging Star" : r.artist_status === "established" ? "👑 Established Benchmark" : "Candidate Act";
+              const status = r.is_emerging
+                ? "🌟 Emerging Act"
+                : r.artist_status === "established"
+                ? "👑 Established Benchmark"
+                : "Candidate Act";
               return [
                 `Status: ${status}`,
-                `Growth: +${Math.round((r.growth || 0) * 100)}%`,
-                `Audience: ${r.recent.toFixed(1)} listeners/mo (Baseline: ${r.baseline.toFixed(1)})`,
-                r.soundalike_name ? `Fans also like: ${r.soundalike_name} (${Math.round((r.soundalike_share || 0) * 100)}%)` : "",
+                `Growth: +${Math.round((r.growth || 0) * 100)}% (Mar → Aug 2026)`,
+                `Recent Audience: ${Math.round(r.recent)} listeners/mo (Baseline: ${Math.round(r.baseline)})`,
+                r.soundalike_name
+                  ? `Fans also like: ${r.soundalike_name} (${Math.round((r.soundalike_share || 0) * 100)}% match)`
+                  : "",
                 `Market: ${r.country || "Unknown"}`,
               ].filter(Boolean);
             },
@@ -294,6 +331,47 @@ export function renderScatter(canvas, rows = [], th = {}, selectedId = null, onS
     },
     plugins: [quadrantPlugin, artistScatterLabelsPlugin],
   });
+
+  chart._zoomPreset = zoomPreset;
+  chart._th = th;
+  chart._rawBounds = { scaleXMin, scaleXMax: rawXmax, scaleYMin, scaleYMax: rawYmax };
+  return chart;
+}
+
+/**
+ * Dynamically re-scales an existing Chart instance without destroying it.
+ */
+export function setChartZoom(chart, mode) {
+  if (!chart || !chart.options || !chart.options.scales) return;
+  const th = chart._th || {};
+  const raw = chart._rawBounds || { scaleXMin: 0, scaleXMax: 400, scaleYMin: 0, scaleYMax: 1600 };
+
+  if (mode === "emerging") {
+    chart.options.scales.x.min = 0;
+    chart.options.scales.x.max = Math.min(Math.ceil(raw.scaleXMax), Math.max(350, Math.round((th.recent_cutoff || 150) * 1.25)));
+    chart.options.scales.y.min = 0;
+    chart.options.scales.y.max = 1600;
+  } else if (mode === "velocity") {
+    chart.options.scales.x.min = 0;
+    chart.options.scales.x.max = Math.min(Math.ceil(raw.scaleXMax), 400);
+    chart.options.scales.y.min = 400;
+    chart.options.scales.y.max = Math.ceil(raw.scaleYMax);
+  } else if (mode === "superstars") {
+    chart.options.scales.x.min = 150;
+    chart.options.scales.x.max = Math.ceil(raw.scaleXMax);
+    chart.options.scales.y.min = 0;
+    chart.options.scales.y.max = 350;
+  } else {
+    // Auto / All
+    chart.options.scales.x.min = 0;
+    chart.options.scales.x.max = Math.ceil(raw.scaleXMax / 50) * 50;
+    chart.options.scales.y.min = 0;
+    chart.options.scales.y.max = Math.ceil(raw.scaleYMax / 100) * 100;
+  }
+
+  chart._zoomPreset = mode;
+  chart.update();
+}
 }
 
 /**
