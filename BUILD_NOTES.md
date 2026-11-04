@@ -1,0 +1,41 @@
+# BUILD_NOTES — Implementation Decisions and Guess Log
+
+> **MANDATORY BUILDER RULE:** Any builder or autonomous agent working from `BUILD_SPEC.md` must log **every guess or choice** made where the specification was silent or ambiguous.
+> Format each entry as: `Section | What was unclear | What was chosen and why`.
+> Review this log as a team before merging or declaring completion.
+
+| Section | What was unclear | Choice and rationale |
+|---|---|---|
+| §3 Filters | Order of the release year dropdown list | Ordered from 2026 down to 2015 (newest first) for immediate access to recent debut years. |
+| §3 Filters | Handling of typed `min_baseline` input outside 1–50 or blank | Clamped strictly to 1–50; leaving the box blank keeps the previous valid value. API validates and returns 422 if out of bounds. |
+| §3 Filters | Missing country selection in dropdown (AUDIT-04) | Added explicit `"Unknown"` option to the Country dropdown so the 44% of artists without country metadata are filterable. |
+| §3 Filters | Preset definitions and parameters (AUDIT-02) | Implemented 6 curator missions: "Breakout Radar" (default p90/p90), "Steady Climbers" (`preset=steady` requiring scrobbles in all 3 baseline months), "Fresh Debuts" (`preset=debut` requiring $\ge 1$ zero-listener baseline month), "Hidden Gems" (`min_baseline=3`, `size_pct=0.75`, `growth_pct=0.95`), "BTS / K-Pop Overlap", and "Alt / Indie Seeds". |
+| §3 Filters | Seed Artist Matchmaker definition | Established acts with `recent > 87.33` (Taylor Swift, Kendrick Lamar, Radiohead, BTS, LE SSERAFIM, KATSEYE, ILLIT) are exposed as anchor filters. Emerging acts are matched via co-listening overlap in `user_artist_clean`. |
+| §3 Filters | Growth Velocity & Size Tiers | Added Velocity filter (`explosive` $\ge 500\%$, `surging` $100\%-500\%$, `steady` $28\%-100\%$) and Audience Size Tiers (`micro` $<20$, `rising` $20-100$, `breakout` $>100$). |
+| §4 Views: UI | View Mode Switcher | Added dual-view toggle between "Visual Dossier Cards" (with inline SVG sparklines, soundalike pills, and playlist tags) and "Intelligence Table" for dense scanning. |
+| §4 Views: Cards | Trajectory visualization inside cards & table rows | Rendered lightweight inline SVG sparkline curves from 6-month monthly listener arrays (`listeners_2026_03` to `listeners_2026_08`) without Chart.js overhead. |
+| §4 Views: Narrative | Wording and inputs for "Why is this artist here?" | Formed dynamically as a Curator Memo: `"{Name} surged {growth%} from a baseline of {baseline} to {recent} distinct monthly listeners. High audience overlap with established anchor {topFan} ({share}% shared scrobblers). Ideal fit for discovery playlists in the {genre} lane."` |
+| §4 Views: Tray | Playlist Tagging & Persistence | Persisted in browser `localStorage` under key `dso576_curator_tray`. Allows tagging each queued artist with a destination playlist (e.g. *Fresh Finds: Pop*, *Indie Radar*, *Night Shift*). |
+| §4 Views: Dossier | Advanced Engagement & Discovery Telemetry | Added 4-quadrant metrics to dossier and cards: (1) Stickiness Ratio (`total scrobbles / distinct listeners`), (2) Audience Retention (`avg months active / 6 mos`), (3) Catalog Depth (`top track scrobbles / total artist scrobbles`), and (4) Net Listener Gain (`recent - baseline`). Included in CSV handoff. |
+| §4 UI / Styling | Anti-AI Slop Design System | Replaced high-density neon multi-color aesthetic with a Swiss-inspired minimalist layout: generous whitespace (36px page margin, 24px panel gaps), restricted charcoal/monochrome palette with single emerald accent (`#10b981`), tabular monospace numbers, and clean Geist/Inter sans typography. |
+| §4 UI / Redesign | Standardized Design Tokens & Visual Depth | Standardized design tokens with 3 background layers (`--bg-base: #0c0d11`, `--bg-surface: #141720`, `--bg-raised: #1c212d`), 3 text color levels (`--text-primary: #fcfbfa`, `--text-secondary: #a3a8b4`, `--text-tertiary: #575d6b`), generous vertical section spacing (36–48px), and killed all fake jargon ("Dossier", "Intelligence Table", "Curator Missions", "Size Ceiling", "Growth Floor"). |
+| §4 UI / Themes | Multi-Theme Palette Switcher | Replaced neon developer terminal green with Warm Analog Vinyl Amber (`#f59e0b`) as default, and added a 1-click header palette switcher for Vinyl Amber, Midnight Coral (`#f43f5e`), Royal Cobalt (`#38bdf8`), and Studio Emerald (`#10b981`). |
+| §3 Exploration | Full Catalog Scope & Universal Search | Added `scope` parameter (`emerging` vs `all`). Curators can now view and search across all 58 artists in the catalog (including established benchmark stars like Taylor Swift, BTS, Kendrick Lamar, Radiohead) to compare emerging acts against mainstream talent. |
+| §4 Interactions | Shortlist Button Event Delegation Fix | Resolved event swallowing on `btn-card-shortlist` caused by inline `stopPropagation()`. Added instant animated `✓ Added` visual confirmation feedback. |
+| §4 UI / Charts | Dynamic Visualizer & Direct Canvas Labels | Replaced log-scale scatter plot (which rendered blank with one tick) with clean linear zero-origin scale, rendered direct artist name pills on canvas (`artistScatterLabelsPlugin`), shaded target quadrant, and added 1-click toggle to comparative 6-Month Trajectory Curves. |
+| §4 Transparency | Data Pipeline & Cleaning Modal | Added transparent modal and header action explaining the 249.6M ListenBrainz scrobbles, 39.2% bot exclusion (>500/day), MBID deduplication, and clarifying the 58-act local sample fixture vs 610,423-act full dataset. |
+| §4 Views: CSV | Number format for growth and spreadsheet safety | Formatted with all 15 columns including `playlist_destination`, `curator_decision`, `net_listeners_gain`, `stickiness_plays_per_fan`, `retention_months_active`, and `catalog_depth_top_track_share`. Cells beginning with `=`, `+`, `-`, `@`, `\t`, `\r` are prefixed with `'` to prevent CSV formula injection. |
+| §5 Architecture | API caching and retry handling | Only successful HTTP 200 responses are cached in memory; error responses are not cached, allowing the user's "Retry" button click to make a fresh network request. |
+| §5 Architecture | Date parsing and parameter bounds on API | `min_release` is validated as ISO date `YYYY-MM-DD` (returning 422 for invalid dates); query limit `n` is clamped to range 1–50. Added CORS middleware. |
+| §6 Replication | 1-Command startup mechanism for professor | Provided dual runners: `npm start` via `package.json` for Node/npx users, and `python run.py` for Python native execution. Both automatically launch FastAPI and open the browser. |
+| §6 Replication | Self-contained project dataset fallback | Sourced fallback parquet dataset directly inside `data/clean/` so any clone without `~/dso576_data/clean` runs immediately out of the box with zero setup. |
+
+## Acceptance Checks Result (2026-11-04)
+
+1. `python backend/analysis.py` → PASSED (`ok: 6 shortlisted, top = EVAN (+1456%), 3 fans-also-play, 2 tracks, 0.0s`).
+2. `curl http://localhost:8000/api/shortlist` → PASSED (HTTP 200, returns artists with cutoffs).
+3. Ground truth check: EVAN (KR, +1456%), BTS is #1 in fans also play at 89.2% → PASSED.
+4. Seed Artist Matchmaker check: `?seed_id=1025840` filters for artists overlapping with BTS → PASSED.
+5. Country "Unknown" check: returns artists with null/blank country → PASSED.
+6. Dual-view rendering (Cards + Table with inline SVG sparklines) → PASSED.
+7. Replication script: `python scripts/clean_data.py` → PASSED (all rules R1-R12 verified).

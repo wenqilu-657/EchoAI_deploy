@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-11-04T15:07:38Z",
+  "data_dir": "/Users/kunjeshgupta/dso576_data/clean",
+  "total_artists": 58,
+  "scored_artists": 55,
+  "shortlisted": 6,
+  "top_artist": "EVAN",
+  "top_growth": 14.5625,
+  "top_co_listen": "BTS",
+  "audit_checks_passed": true,
+  "runtime_seconds": 0.053
+}

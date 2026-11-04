@@ -1,0 +1,20 @@
+{
+  "name": "dso576-emerging-artist-discovery",
+  "version": "2.0.0",
+  "description": "Emerging Artist Discovery Dashboard built on MusicBrainz & ListenBrainz data for playlist curators",
+  "scripts": {
+    "start": "python run.py",
+    "dev": "python run.py",
+    "test": "python backend/analysis.py"
+  },
+  "keywords": [
+    "musicbrainz",
+    "listenbrainz",
+    "emerging-artists",
+    "playlist-curation",
+    "duckdb",
+    "fastapi"
+  ],
+  "author": "Team EchoAI (USC Marshall DSO 576)",
+  "license": "MIT"
+}

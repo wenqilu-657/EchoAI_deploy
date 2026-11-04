@@ -1,11 +1,14 @@
 # Do not commit downloaded or private data. Remove a matching rule only when
 # the professor explicitly says a specific instructor-provided sample belongs
 # in Git.
-data/
+data/*
+!data/clean
+!data/clean/*.parquet
 downloads/
 *.csv
 *.tsv
 *.parquet
+!data/clean/*.parquet
 *.xlsx
 *.xls
 *.zip

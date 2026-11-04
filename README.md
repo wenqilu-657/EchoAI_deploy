@@ -1,3 +1,75 @@
+# EchoAI — Emerging Artist Discovery Dashboard (USC MSBA DSO 576)
+
+[![Tests](https://img.shields.io/badge/tests-11%20passed-10b981?style=flat-square)](file:///Users/kunjeshgupta/Documents/USC%20MSBA/dso576/dso576_project/tests/test_analysis_and_api.py)
+[![Data Cleaning](https://img.shields.io/badge/cleaning%20audit-verified-10b981?style=flat-square)](file:///Users/kunjeshgupta/Documents/USC%20MSBA/dso576/dso576_project/output/cleaning_replication_report.json)
+[![UI Design](https://img.shields.io/badge/design-swiss%20minimalist-0b0d10?style=flat-square)](file:///Users/kunjeshgupta/Documents/USC%20MSBA/dso576/dso576_project/web/styles.css)
+
+An intelligence suite designed for editorial playlist curators at streaming platforms (Spotify, Apple Music) and independent tastemakers. Built on **MusicBrainz metadata** and **ListenBrainz scrobbles (March–August 2026)** to identify breakout talent before mainstream algorithmic saturation.
+
+---
+
+## ⚡ 1-Command Local Startup
+
+Clone the repository and run:
+
+```bash
+# Option A: Native Python (recommended)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python run.py
+
+# Option B: Node / npm
+npm start
+```
+
+The application will automatically initialize the DuckDB in-memory analytical engine and open `http://localhost:8000` in your default browser.
+
+---
+
+## 🎯 What is an "Emerging Artist"?
+
+Traditional discovery relies solely on raw stream counts, which biases toward established viral hits. EchoAI identifies emerging acts using a rigorous, multi-factor analytical gate:
+
+1. **Size Ceiling ($p_{90}$ Percentile):** Monthly listeners must remain below the 90th percentile of scored acts ($\le 87.3$ listeners/month canonical; $\le 298.0$ in sample), filtering out established stars.
+2. **Growth Velocity ($p_{90}$ Percentile):** Audience growth between the baseline window (Mar–May 2026) and recent window (Jun–Aug 2026) must exceed the 90th percentile ($\ge +28.1\%$ canonical; $\ge +407.1\%$ in sample).
+3. **Activity Floor:** Minimum $\ge 5$ average monthly listeners during the baseline window, with verified active listening in at least 2 distinct baseline months (eliminating "one-month flash" anomalies).
+
+### Key Advanced Telemetry & Analytics:
+* **Stickiness Ratio (`listens / listeners`):** Measures repeat listening depth. High stickiness ($>3.0\times$) indicates fan loyalty rather than passive autoplay.
+* **Audience Retention (`avg_months_active / 6`):** How consistently scrobblers return across the 6-month observation window.
+* **Catalog Depth / Track Dependency (`top_track / total`):** Identifies whether growth is concentrated in a single viral track ($>65\%$) or spread across an artist's full discography (deep catalog).
+* **Taste Community Overlap (`share_of_fans`):** Solves cold-start sparse genre tags by calculating co-listening overlap with established benchmark acts (e.g. *BTS, Radiohead, Taylor Swift*).
+
+---
+
+## 🛠️ Reproducibility & Auditing
+
+The grading instructor can verify the entire data cleaning and analytical engine with zero external setup:
+
+```bash
+# 1. Run the canonical data cleaning replication audit (Rules R1-R12)
+python scripts/clean_data.py
+
+# 2. Run the feature & threshold audit checks
+python audit/kunjesh_audit_checks.py
+
+# 3. Run the automated unit & integration test suite (11 tests)
+python -m unittest discover tests
+```
+
+---
+
+## ☁️ Deploy to Vercel
+
+The project includes serverless Python handlers (`api/index.py` and `vercel.json`) ready for one-click deployment:
+
+```bash
+# Deploy with Vercel CLI
+npx vercel
+```
+
+---
+
 # Module 3 Project Starter
 
 Use this repository to investigate two candidate project Visions, combine the
