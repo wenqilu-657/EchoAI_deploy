@@ -165,7 +165,8 @@ function syncSliderInputs() {
   if ($("slider-growth-pct") && s.growth_pct != null) {
     const pctVal = Math.round(s.growth_pct * 100);
     $("slider-growth-pct").value = pctVal;
-    $("val-growth-pct").textContent = `≥ ${pctVal}th Pct`;
+    const note = pctVal >= 95 ? " (Ultra-Breakout)" : pctVal === 90 ? " (Strict Default)" : "";
+    $("val-growth-pct").textContent = `≥ ${pctVal}th Pct${note}`;
   }
   if ($("slider-size-pct") && s.size_pct != null) {
     const pctVal = Math.round(s.size_pct * 100);
@@ -216,6 +217,34 @@ async function loadList() {
     $("kpi-size").textContent = `≤ ${f1(res.thresholds.recent_cutoff)} /mo`;
     $("kpi-growth").textContent = `≥ ${pct(res.thresholds.growth_cutoff)}`;
 
+    // Update dynamic KPI labels to reflect slider values
+    const growthPctVal = Math.round((state.sliders.growth_pct || 0.90) * 100);
+    const sizePctVal = Math.round((state.sliders.size_pct || 0.90) * 100);
+    if ($("kpi-growth-label")) $("kpi-growth-label").textContent = `Min Growth Rate (${growthPctVal}th %)`;
+    if ($("kpi-size-label")) $("kpi-size-label").textContent = `Audience Limit (${sizePctVal}th %)`;
+
+    // Dynamic Scope Badges & Descriptions
+    if (state.scope === "emerging") {
+      if ($("scope-count-emerging")) $("scope-count-emerging").textContent = count;
+      if ($("active-mission-pill")) {
+        $("active-mission-pill").textContent = `Curator Studio: 🌟 Emerging Shortlist (${count} Act${count === 1 ? "" : "s"})`;
+      }
+      if ($("scope-description")) {
+        const yr = (state.sliders.min_release || "2023-01-01").split("-")[0];
+        $("scope-description").textContent =
+          `Showing ${count} qualifying emerging act${count === 1 ? "" : "s"} passing the ${growthPctVal}th percentile growth gate (≥ ${pct(res.thresholds.growth_cutoff)}), ${sizePctVal}th percentile audience limit (≤ ${f1(res.thresholds.recent_cutoff)}/mo), and debuted on or after ${yr}.`;
+      }
+    } else {
+      if ($("scope-count-all")) $("scope-count-all").textContent = count;
+      if ($("active-mission-pill")) {
+        $("active-mission-pill").textContent = `Curator Studio: 🌐 Catalog Explorer (${count} Acts)`;
+      }
+      if ($("scope-description")) {
+        $("scope-description").textContent =
+          `Showing all ${count} catalog artists. Benchmarking emerging acts against mainstream talent.`;
+      }
+    }
+
     // Top anchor
     const topSound = state.rows.find((r) => r.soundalike_name)?.soundalike_name || "BTS";
     $("kpi-anchor").textContent = `${topSound} (89%)`;
@@ -225,7 +254,7 @@ async function loadList() {
       $("results-heading").textContent = `Search Results: "${esc(state.filters.search)}"`;
       $("kpi-count-label").textContent = "Artists Found";
     } else if (state.filters.status === "emerging" || state.scope === "emerging") {
-      $("results-heading").textContent = "Qualifying Emerging Artists";
+      $("results-heading").textContent = `Qualifying Emerging Artists (${count} Acts at ${growthPctVal}th % Growth)`;
       $("kpi-count-label").textContent = "Qualifying Emerging Acts";
     } else if (state.filters.status === "established") {
       $("results-heading").textContent = "Established Mainstream Benchmarks";
@@ -950,7 +979,9 @@ async function init() {
     $("slider-growth-pct").addEventListener("input", (e) => {
       const val = +e.target.value;
       state.sliders.growth_pct = val / 100;
-      $("val-growth-pct").textContent = `≥ ${val}th Pct`;
+      const note = val >= 95 ? " (Ultra-Breakout)" : val === 90 ? " (Strict Default)" : " (Broader Pool)";
+      $("val-growth-pct").textContent = `≥ ${val}th Pct${note}`;
+      if ($("kpi-growth-label")) $("kpi-growth-label").textContent = `Min Growth Rate (${val}th %)`;
       onFilterChange();
     });
   }
@@ -959,7 +990,9 @@ async function init() {
     $("slider-size-pct").addEventListener("input", (e) => {
       const val = +e.target.value;
       state.sliders.size_pct = val / 100;
-      $("val-size-pct").textContent = `≤ ${val}th Pct Size`;
+      const note = val <= 75 ? " (Micro Only)" : val === 90 ? " (Default Ceiling)" : "";
+      $("val-size-pct").textContent = `≤ ${val}th Pct Size${note}`;
+      if ($("kpi-size-label")) $("kpi-size-label").textContent = `Audience Limit (${val}th %)`;
       onFilterChange();
     });
   }

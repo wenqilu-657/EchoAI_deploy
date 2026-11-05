@@ -223,12 +223,12 @@
           <span class="metric-sub" id="kpi-sample-note">Local evaluation sample (58 scored)</span>
         </div>
         <div class="metric-card">
-          <span class="metric-label">Audience Limit (90th %)</span>
+          <span class="metric-label" id="kpi-size-label">Audience Limit (90th %)</span>
           <span id="kpi-size" class="metric-value">Loading…</span>
           <span class="metric-sub">Ceiling excluding established superstars</span>
         </div>
         <div class="metric-card">
-          <span class="metric-label">Min Growth Rate (90th %)</span>
+          <span class="metric-label" id="kpi-growth-label">Min Growth Rate (90th %)</span>
           <span id="kpi-growth" class="metric-value accent">Loading…</span>
           <span class="metric-sub">6-month listener gain floor</span>
         </div>
@@ -272,7 +272,7 @@
               <span class="slider-label">Growth Velocity Percentile</span>
               <span class="slider-val-tag" id="val-growth-pct">≥ 90th Pct (Strict)</span>
             </div>
-            <input type="range" id="slider-growth-pct" class="slider-control" min="50" max="99" step="5" value="90">
+            <input type="range" id="slider-growth-pct" class="slider-control" min="50" max="99" step="1" value="90">
             <div class="slider-scale-row">
               <span>50% (Top Half)</span>
               <span>75%</span>
@@ -287,7 +287,7 @@
               <span class="slider-label">Audience Size Ceiling</span>
               <span class="slider-val-tag" id="val-size-pct">≤ 90th Pct Size</span>
             </div>
-            <input type="range" id="slider-size-pct" class="slider-control" min="50" max="99" step="5" value="90">
+            <input type="range" id="slider-size-pct" class="slider-control" min="50" max="99" step="1" value="90">
             <div class="slider-scale-row">
               <span>50% (Micro)</span>
               <span>75%</span>
