@@ -1,130 +1,236 @@
-# BUILD_SPEC — Emerging Artist Discovery (Team EchoAI) · v1.1
+# BUILD_SPEC — Emerging Artist Discovery (Team EchoAI) · v2.0
 
-## 1. Vision
+## 1. Vision & Problem Definition
 
-**User:** an editorial curator at a streaming service or indie playlist brand.
-**Decision:** which small but fast-growing artists to add to next month's discovery playlists, and which **taste community** each one fits. A taste community is the established artists the same listeners already play.
-**Why it improves current practice:** charts surface artists who are already big, and reviewing submissions one by one does not show who is gaining listeners. This tool ranks artists who are still small but growing fast in real listening data (ListenBrainz, Mar–Aug 2026: 58,378 listeners, 138M artist-credited listens after removing bots). It also shows each artist's audience overlap with established artists, which works even for artists with no genre tags (82% of the default shortlist).
-**Changed since Phase 1:** the listener age/gender, listener-geography and playlist-engagement panels are removed, because no source contains those fields. "Listener segment" becomes "taste community" (co-listening). "Spotify" becomes a general streaming or indie curator, because ListenBrainz users are not Spotify's population. The Phase 1 output (a shortlist for human review) is kept.
+**User:** An editorial curation lead at a music streaming service or independent playlist brand (platform-agnostic).
+**Decision:** Which small but fast-growing artists to add to next month's discovery playlists, and which **taste community** each artist fits into.
+**Core Mechanism:**
+- **Emerging:** Small audience (`recent` monthly listeners $\le$ 90th percentile) combined with high listener growth (`growth` $\ge$ 90th percentile) over a 6-month observation window (March–August 2026).
+- **Taste Communities:** Established artists co-listened to by the same listeners (`share_of_fans`), providing immediate stylistic and audience context even when genre tags are completely missing (which is true for ~82% of emerging artists).
+- **Audit Resolutions (v2.0):**
+  - **AUDIT-01 (Catalogued vs Debut):** Relabeled release date to "First Catalogued (MB)" with an active UI badge indicating when listening activity predated the catalogued release date.
+  - **AUDIT-02 (Debut Spike vs Steady Risers):** Introduced curator presets separating "Steady Risers" (consistent audience throughout baseline months) from "Fresh Debuts" (sudden mid-window arrivals with zero-listener early months), ensuring fair growth comparisons.
+  - **AUDIT-03 (Top Tracks Context):** Provides recording-level traction metrics with direct MusicBrainz links and listener trajectories.
+  - **AUDIT-04 (Country Filter Inclusivity):** Added explicit "Unknown" country filtering so curators can discover the 44% of shortlisted artists lacking country metadata.
+  - **Shortlist Persistence & Security:** Tray saved in `localStorage` across page reloads; CSV export hardened against spreadsheet formula injection.
 
-### Use cases (select → see → decide)
-| # | User selects / inputs | Dashboard shows | User decides |
+### Use Cases (Select → See → Decide)
+| # | User Selects / Inputs | Dashboard Shows | Curator Decides |
 |---|---|---|---|
-| U1 | Release year, audience-size and growth percentiles, optional genre/country | Ranked shortlist + size-vs-growth scatter | Which artists deserve a closer look |
-| U2 | Clicks an artist | 6-month listener trend, baseline vs recent | Sustained growth or a one-month spike |
-| U3 | Same artist | "Fans also play": established artists by share of shared listeners | Which playlist/taste community to place them in |
-| U4 | Same artist | Top tracks by recent listeners, linked to MusicBrainz | Which track to slot |
-| U5 | **Add to shortlist**, then **Export CSV** | Shortlist tray with a suggested "sounds like" artist each | Final list handed to scheduling |
+| **U1** | Curator preset or custom sliders (release year, baseline, size & growth percentiles, genre, country) | Ranked shortlist table, KPI summary strip, and size-vs-growth scatter plot | Which artists qualify for detailed editorial review |
+| **U2** | Clicks an artist in the table or scatter dot | Profile header, narrative summary sentence ("Why is this artist here?"), and 6-month monthly listener trend | Whether the artist shows sustained momentum or a fleeting spike |
+| **U3** | Same artist | "Fans also play" taste community bar chart (% of shared fans playing established artists) | Which playlist sub-genre / sound community the artist fits |
+| **U4** | Same artist | Top tracks ranked by recent monthly listeners, linked to MusicBrainz recordings | Which specific song to slot into the playlist |
+| **U5** | Clicks **Add** to shortlist, then **Export CSV** | Bottom shortlist tray with automatic "Sounds like" top reference artist, persisted in `localStorage` | Final shortlisted handoff exported to scheduling |
 
-## 2. How to use this spec (building agent)
-**Task:** build `api/` and `web/` as specified in sections 3–5, in the order in section 6, until every check in section 7 passes.
-**Already done, do not edit:** `extraction/` (builds the data), `DATA_DECISIONS.md` (definitions D1–D10), `backend/analysis.py` (all metrics; `python backend/analysis.py` is its test).
-**Rules:**
-1. Every metric shown comes from a `backend/analysis.py` function. The API and browser never compute or redefine a metric; counting returned rows, sorting, paging and formatting are allowed.
-2. If a needed function seems missing or wrong, stop and report it. Do not edit `backend/`, `extraction/` or the data.
-3. Build only what this spec lists. Section 8 is out of scope.
-4. If something is truly unspecified, choose the simplest option consistent with this spec and log it in `BUILD_NOTES.md` (section · what was unclear · what you chose). Done means every check passes and this log is empty or reviewed.
+---
 
-**Prerequisites:** Python ≥ 3.11 venv with `pip install -r requirements.txt` (add `fastapi` and `uvicorn` to it). The five canonical Parquet tables listed in `DATA_DECISIONS.md` §5 must be in `~/dso576_data/clean/` (or `$DSO576_DATA`); rebuild or verify them as in §6 there. Check 1 below confirms the data is in place.
+## 2. Builder Rules & Governance
 
-## 3. Dashboard (single page)
+1. **Single Source of Truth:** All metrics are computed strictly in one backend module: [`backend/analysis.py`](file:///Users/kunjeshgupta/Documents/USC MSBA/dso576/dso576_project/backend/analysis.py). The API and browser never compute or redefine a metric. Sorting, pagination, formatting, and client-side tray management are permitted.
+2. **Mandatory Guess Logging (`BUILD_NOTES.md` Rule):** Any builder or autonomous agent working from this spec must log **every single guess or design choice** made where this spec was silent or ambiguous in [`BUILD_NOTES.md`](file:///Users/kunjeshgupta/Documents/USC MSBA/dso576/dso576_project/BUILD_NOTES.md) (Format: `Section | What was unclear | What was chosen and why`). Completion requires that this log is reviewed and verified.
+3. **Verified Numbers:** Every number quoted in documentation and tests must be verified against actual data. Never guess row counts or percentiles.
+4. **Scope Control:** Build strictly what is specified in sections 3–6. Section 9 is strictly out of scope.
 
-**Starting view:** default filters applied; the KPI strip, scatter and table load immediately; the detail panel says "Select an artist to see details."
-**Layout:** header + KPI strip on top; filters in a left column; scatter above the table in the center; detail panel on the right; shortlist tray across the bottom. Below 900 px wide, stack in that order.
+---
 
-### Metric definitions (as implemented in `backend/analysis.py`; data rules in `DATA_DECISIONS.md`)
-| Metric | Definition |
-|---|---|
-| Monthly listeners | Distinct non-bot users with ≥ 1 listen credited to the artist in that calendar month (UTC), from `artist_month_clean`. A listen credited to several artists counts for each. A month with no listens = 0. |
-| `baseline` / `recent` | Mean of monthly listeners over Mar–May / Jun–Aug 2026: (sum of the 3 months) ÷ 3, zeros included. |
-| `growth` | (`recent` − `baseline`) ÷ `baseline`, a proportion. `null` when `baseline` = 0; such artists are never shortlisted. |
-| Cutoffs (`thresholds()`) | `recent_cutoff` = `size_pct` quantile of `recent`; `growth_cutoff` = `growth_pct` quantile of `growth` (linear interpolation), over all artists with `baseline` ≥ `min_baseline`. Only those three controls change the cutoffs; release year, genre and country filter afterwards. |
-| Shortlisted | `baseline` ≥ `min_baseline`, `recent` ≤ `recent_cutoff`, `growth` ≥ `growth_cutoff`, `first_release_date` ≥ `min_release`, plus optional genre (exact match within `top_genres`) and country. |
-| Established artist | `recent` > the **default** `recent_cutoff` (87.3), independent of the sliders. |
-| `share_of_fans` | Of all non-bot users who listened to the selected artist at any time Mar–Aug 2026 (`user_artist_clean`), the share who also listened to the other artist in that window. |
-| Track `recent` / `baseline` | Mean monthly distinct listeners of a recording over Jun–Aug / Mar–May (`recording_month`); tracks are matched by the artist's MBID. |
+## 3. Metric Definition Table
 
-### Filters (U1) — any change reloads the shortlist (300 ms debounce) and resets the table to page 1
-| Control | Type | Default | `shortlist()` argument |
-|---|---|---|---|
-| First release on/after | Year select 2015–2026 | 2023 | `min_release` = `"YYYY-01-01"` |
-| Min baseline listeners/month | Number 1–50 | 5 | `min_baseline` |
-| Audience size: below percentile | Slider 50–99 | 90 | `size_pct` = value / 100 |
-| Growth: at/above percentile | Slider 50–99 | 90 | `growth_pct` = value / 100 |
-| Genre | "All genres" + `genre_options()` | All | `genre` (omit for All) |
-| Country (ISO code) | "All countries" + `country_options()` | All | `country` (omit for All) |
-| Reset | Button | — | restores all defaults |
+All metrics are implemented in [`backend/analysis.py`](file:///Users/kunjeshgupta/Documents/USC MSBA/dso576/dso576_project/backend/analysis.py) and adhere to canonical definitions in [`DATA_DECISIONS.md`](file:///Users/kunjeshgupta/Documents/USC MSBA/dso576/dso576_project/DATA_DECISIONS.md).
 
-Helper text under Genre: "Only ~18% of shortlisted artists have genre tags."
-
-### Views and metrics
-| Element | Serves | Question it answers | Source → field(s) | Display |
-|---|---|---|---|---|
-| KPI: Artists shortlisted | U1 | How many candidates meet the bar? | number of rows returned by `/api/shortlist` | integer |
-| KPI: Size cutoff | U1 | What counts as "small" now? | `thresholds()` → `recent_cutoff` | "≤ 87.3 listeners/mo" |
-| KPI: Growth cutoff | U1 | What counts as "fast-growing" now? | `thresholds()` → `growth_cutoff` | "≥ +28%" |
-| Scatter | U1 | Who grows fastest relative to size? | `shortlist()` → x `recent` (log axis), y `growth` × 100 (%) | one color per first-release year; dashed lines at both cutoffs; tooltip: name, recent, growth |
-| Table | U1 | Ranked list to scan | `shortlist()` | Name, Country, Genres, First release, Baseline/mo, Recent/mo, Growth %, [Add]; sorted by growth desc; any column sortable; 25 rows/page |
-| Detail header | U2 | Who is this? | `artist_profile(id)` | name, type, country, genres, first release, baseline, recent, growth, [Add] |
-| Trend line | U2 | Sustained growth or a spike? | `artist_trend(id)` → `month`, `listeners` | 6 points Mar–Aug 2026; Mar–May shaded "baseline", Jun–Aug "recent" |
-| Fans also play | U3 | Which taste community? | `fans_also_play(id, 10)` → `name`, `top_genres`, `share_of_fans` | horizontal bars, % of this artist's listeners; label = name + first genre in `top_genres` |
-| Top tracks | U4 | Which track drives the growth? | `top_tracks(id, 5)` → `url`, `recent`, `baseline` | rows "Track 1…5" linked to `url`, with recent vs baseline listeners/mo |
-| Shortlist tray | U5 | What am I handing off? | client state + `fans_also_play(id, 1)` | name, growth %, "Sounds like: <top fans-also-play name>", [Remove], [Export CSV] |
-
-**Interactions:** clicking a table row or a scatter point selects that artist, highlights it in both, and loads the four detail sections in parallel. The selection stays when filters change, even if the artist leaves the shortlist. **Add** (table or detail header) puts the artist in the tray and ignores duplicates. It fetches `fans/?n=1` for "Sounds like" if not already cached; if there is none, it shows "—". **Export CSV** downloads `shortlist.csv` with columns `artist_mbid, name, country, first_release_date, baseline, recent, growth, sounds_like`, in tray order. The tray is kept in page memory only.
-
-**Display rules:** missing genre/country → "Unknown"; growth = `growth × 100`, no decimals, with sign; listener counts one decimal; dates `YYYY-MM-DD`. While a section loads it shows "Loading…". Empty shortlist → "No artists match — loosen a filter" in place of the scatter and table. Empty top tracks → "No track-level data". A failed request shows "Couldn't load — retry" in that section only. Footer: "Source: ListenBrainz (dump 2722) + MusicBrainz, Mar–Aug 2026. ListenBrainz listeners are self-selected enthusiasts; growth means traction in this community, not mainstream popularity."
-
-## 4. Architecture
-
-Each piece has one job and talks only to its neighbor, so each can be built and checked alone.
-
-| Piece | Path | Job | Checked by | Must not |
-|---|---|---|---|---|
-| Data | `~/dso576_data/clean/*.parquet` | Canonical tables (`DATA_DECISIONS.md`) | `extraction/` logs | be written by the app |
-| Analysis | `backend/analysis.py` (exists) | All metric logic → DataFrames; safe for concurrent calls | `python backend/analysis.py` | know about HTTP or HTML |
-| API | `api/app.py` | Translate HTTP ↔ analysis calls; serve `web/` | curl / `/docs` | contain metric logic |
-| Fetch | `web/api.js` | One function per endpoint, returns parsed JSON or throws | browser console | touch the DOM |
-| Charts | `web/charts.js` | `renderScatter`, `renderTrend`, `renderFans(container, data)`; draw only | open with sample JSON | fetch or hold state |
-| App | `web/app.js` + `index.html` + `styles.css` | One `state` object (`filters`, `rows`, `thresholds`, `selectedId`, `tray`), event wiring, table, KPIs, tray, CSV | acceptance checks | compute metrics (sort, page and format are fine) |
-
-`web/*.js` are ES modules (`<script type="module">`). No other shared state.
-
-### API contract
-| Endpoint | Calls | Returns (JSON) |
+| Metric | Code Definition (`backend/analysis.py`) | Interpretation & Boundaries |
 |---|---|---|
-| `GET /api/options` | `genre_options()`, `country_options()` | `{genres:[str], countries:[str], defaults:{min_release:"2023-01-01", min_baseline:5, size_pct:0.9, growth_pct:0.9}}` |
-| `GET /api/shortlist?min_release&min_baseline&size_pct&growth_pct&genre&country` (all optional) | `thresholds()`, `shortlist()` | `{thresholds:{recent_cutoff, growth_cutoff, n_scored}, artists:[Artist]}` |
-| `GET /api/artist/{id}` | `artist_profile(id)` | `Artist`, 404 if unknown |
-| `GET /api/artist/{id}/trend` | `artist_trend(id)` | `[{month, listeners, listens}]` (`month` = 202603…202608) |
-| `GET /api/artist/{id}/fans?n=10` | `fans_also_play(id, n)` | `[{artist_id, name, top_genres, recent, shared_listeners, share_of_fans}]` |
-| `GET /api/artist/{id}/tracks?n=5` | `top_tracks(id, n)` | `[{recording_mbid, url, recent, baseline, listens}]` |
+| **Monthly Distinct Listeners** | Distinct non-bot users scrobbling $\ge 1$ listen credited to the artist in that calendar month (UTC). Months with zero scrobbles = `0`. | Bot accounts (>500 scrobbles on any UTC day) removed (Decision D5). Listen credited to multiple artists counts once for each. |
+| **Baseline Listeners (`baseline`)** | `(listeners_2026_03 + listeners_2026_04 + listeners_2026_05) / 3.0` | Arithmetic mean of monthly distinct listeners over March–May 2026 (Decision D7). Fractional values allowed. |
+| **Recent Listeners (`recent`)** | `(listeners_2026_06 + listeners_2026_07 + listeners_2026_08) / 3.0` | Arithmetic mean of monthly distinct listeners over June–August 2026 (Decision D7). |
+| **Growth (`growth`)** | `(recent - baseline) / NULLIF(baseline, 0)` | Fractional ratio (e.g. `1.456` = +145.6% growth). Artists with `baseline = 0` yield `NULL` and are excluded from standard growth ranking. |
+| **Size Cutoff (`recent_cutoff`)** | `quantile_cont(recent, size_pct)` over all artists with `baseline >= min_baseline`. Default $p90 \approx 87.33$. | Linear continuous interpolation. Computed globally before genre/country filters so cutoffs remain objective. |
+| **Growth Cutoff (`growth_cutoff`)** | `quantile_cont(growth, growth_pct)` over all artists with `baseline >= min_baseline`. Default $p90 \approx 0.2807$ (+28.1%). | Linear continuous interpolation across active candidate population. |
+| **Shortlist Criteria** | `baseline >= min_baseline` AND `recent <= recent_cutoff` AND `growth >= growth_cutoff` AND `first_release_date >= min_release` (plus optional genre & country). | Default filters yield **1,131 artists** on canonical data. |
+| **Established Artist** | Artist with `recent > default_recent_cutoff` (87.3 listeners/mo). | Reference benchmark for co-listening comparisons. |
+| **Share of Fans (`share_of_fans`)** | `shared_listeners / count(fans)` where fans are users who listened to the target artist during Mar–Aug 2026. | Proportion [0.0, 1.0]. Represents co-listening overlap with an established act. |
+| **Track Traction (`recent` / `baseline`)** | Mean monthly distinct listeners of a recording during Jun–Aug vs. Mar–May (`recording_month`). | Sourced from recording-level listens; mapped by artist MBID. |
 
-`Artist` = `{artist_id, artist_mbid, name, artist_type, country, top_genres, first_release_date, baseline, recent, growth}`. `growth` and `share_of_fans` are proportions (0.28 = 28%). `top_genres` is a "; "-separated string or null. NaN → `null`, dates → `"YYYY-MM-DD"`, invalid parameters → 422.
+---
 
-## 5. Technical choices
-- **API:** FastAPI + uvicorn, run with `uvicorn api.app:app --reload`, open `http://localhost:8000`. FastAPI serves `web/` at `/`.
-- **Queries:** `analysis.py` uses DuckDB on the Parquet files in place, so nothing large is loaded into memory (the track table is 1.2 GB). All functions together run in about 1 s on a MacBook Air.
-- **Web:** plain HTML/CSS/vanilla JS; Chart.js 4 from cdnjs; no framework, no build step.
-- **Caching:** the analysis layer caches thresholds, options and top tracks; `web/api.js` caches artist responses by id for the session.
-- **Config:** only `DSO576_DATA` (data folder). The browser uses relative `/api/...` URLs, so deployment = the same app on any host with the Parquet files.
+## 4. Dashboard Views & Interactions
 
-## 6. Build order
-1. `api/app.py`: six endpoints; check each with curl or `/docs`.
-2. `web/api.js` + `web/app.js` skeleton: filters from `/api/options`, KPIs and table from `/api/shortlist`.
-3. `web/charts.js` scatter; selection sync between table and scatter.
-4. Detail panel: header, trend, fans also play, top tracks.
-5. Shortlist tray and CSV export.
-6. Loading, empty and error states; narrow layout; footer.
+The dashboard is a responsive single-page application. At screen widths below 900px, elements stack vertically in logical order.
 
-## 7. Acceptance checks
-1. `python backend/analysis.py` prints the data summary (610,423 artists; 1,131 shortlisted; 82.5% of them without genre) and `ok: 1131 shortlisted…`.
-2. `GET /api/shortlist` (no parameters) returns 1,131 artists with `recent_cutoff` ≈ 87.3 and `growth_cutoff` ≈ 0.281; on page load the KPIs read 1,131 / ≤ 87.3 / ≥ +28%.
-3. The table's first row is **EVAN** (KR, +1456%). Selecting it shows trend listeners 5, 6, 5, 89, 99, 61 and **BTS** first in "Fans also play" (89%).
-4. First release 2025 → fewer rows, same cutoffs. Genre "hip hop" → every row's genres include "hip hop", same cutoffs.
-5. Shortlisted artists without genres show "Unknown".
-6. Adding 3 artists (one twice) and exporting gives `shortlist.csv` with 3 rows and the 8 listed columns.
-7. Stop the API, then click an artist that has not been opened this session (so nothing is cached): its detail sections show "Couldn't load — retry" while the rest of the page stays usable.
+```
++------------------------------------------------------------------------------------+
+|  HEADER: EchoAI — Emerging Artist Discovery          [Shortlist Tray Count: (3)]    |
+|  KPI Strip: [1,131 Shortlisted] | [Size: <= 87.3/mo] | [Growth: >= +28%]           |
++------------------------------------------------------------------------------------+
+|  PRESETS: [ Breaking Out ] [ Steady Climbers ] [ Fresh Debuts ] [ Hidden Gems ]    |
++--------------------------+----------------------------------+----------------------+
+| FILTERS (U1)             | MAIN VISUALIZATIONS              | DETAIL PANEL (U2-U4) |
+| - First Catalogued >=    | Scatter Plot (Size vs Growth)    | - Artist Profile     |
+| - Min Baseline / mo      | [Interactive log-x, %-y points]  |   "Why here?" note   |
+| - Size Percentile Slider +----------------------------------+ - 6-Mo Trend Line     |
+| - Growth Pct Slider      | Ranked Emerging Artists Table    | - Fans Also Play     |
+| - Genre (All / Specific) | Name | Country | MB Date | Growth| - Top Tracks         |
+| - Country (All / Unknown)| [Page 1 of 46] [Add to Tray]     |   [Add to Shortlist] |
++--------------------------+----------------------------------+----------------------+
+| BOTTOM TRAY (U5): Shortlist (3) | EVAN (Sounds like BTS) | [Export CSV] [Clear]     |
++------------------------------------------------------------------------------------+
+```
 
-## 8. Out of scope
-Listener demographics, listener location, playlist data (not in any source); predicting future hits; accounts or saved shortlists; editing data; track titles (not in the data, so tracks link to MusicBrainz).
+### 4.1 Header & KPI Strip
+- **KPI 1: Artists Shortlisted:** Total candidate acts meeting active filter criteria (`artists.length`).
+- **KPI 2: Audience Size Cutoff:** Current upper bound for "emerging" acts (`recent_cutoff`, e.g. "$\le$ 87.3 listeners/mo").
+- **KPI 3: Growth Cutoff:** Current minimum growth threshold (`growth_cutoff`, e.g. "$\ge$ +28%").
+
+### 4.2 Curator Presets Bar
+One-click presets that configure filter parameters instantly:
+1. **Breaking Out (Default):** `size_pct = 0.90`, `growth_pct = 0.90`, `min_baseline = 5`, `min_release = 2023-01-01`. Captures the premier 90th-percentile emerging cohort.
+2. **Steady Climbers (AUDIT-02):** Filters for sustained growth acts with scrobbles in all three baseline months (`listeners > 0` in Mar, Apr, and May).
+3. **Fresh Debuts (AUDIT-02):** Highlights artists who debuted in the window (0 baseline listeners in Mar/Apr with a burst in May/Jun).
+4. **Hidden Gems:** `min_baseline = 3`, `size_pct = 0.75`, `growth_pct = 0.95`. Finds small acts with sharp momentum.
+5. **Custom:** Activated whenever the user modifies any slider or dropdown manually.
+
+### 4.3 Filter Panel (U1)
+- **First Catalogued in MB On/After:** Year dropdown (2026 down to 2015). Default `2023`.
+- **Min Baseline Listeners/mo:** Number input clamped to 1–50. Default `5`.
+- **Audience Size Percentile:** Slider 50%–99%. Default `90%`.
+- **Growth Percentile:** Slider 50%–99%. Default `90%`.
+- **Genre:** Dropdown of top 40 genres from `genre_options()` + "All genres". Helper text: *"Only ~18% of shortlisted artists have genre tags."*
+- **Country:** Dropdown of ISO countries from `country_options()` + "All countries" + explicit **"Unknown"** option (resolves AUDIT-04).
+- **Reset:** Restores default settings.
+- *Debounce:* Any filter modification debounces 300ms before querying `/api/shortlist` and resets the table to page 1.
+
+### 4.4 Size vs. Growth Scatter Chart (U1)
+- **X-axis:** Average recent listeners/month on a logarithmic scale.
+- **Y-axis:** Growth percentage (`growth * 100`).
+- **Plotting:** Each dot represents an artist, color-coded by release year.
+- **Reference Lines:** Dashed lines representing `recent_cutoff` (vertical) and `growth_cutoff` (horizontal).
+- **Interactivity:** Hovering displays tooltip (`Name`, `Recent/mo`, `Growth %`, `Country`). Clicking selects the artist and highlights the dot with a distinct high-contrast border and 2x radius.
+
+### 4.5 Ranked Shortlist Table (U1)
+- **Columns:** Name, Country, Genres, First Catalogued (MB), Baseline/mo, Recent/mo, Growth %, Action (`[Add]`).
+- **Sorting:** High-to-low on first click for numeric columns; alphabetical for text; reverse on second click. Missing values sort last. Default sort: `Growth %` descending.
+- **Pagination:** 25 rows per page with previous/next controls and row count indicators.
+- **Selection:** Clicking any row highlights it and opens the artist detail panel.
+
+### 4.6 Artist Detail Panel (U2–U4)
+- **Profile Header:** Name, type (Person/Group), Country, Genres, MusicBrainz link, and an **Add to Shortlist** button.
+  - *Debut Intelligence Badge (AUDIT-01):* If listening activity predates the catalogued MusicBrainz release, displays an alert badge: *"Active scrobbles recorded prior to catalogued release"*.
+- **Narrative Sentence ("Why is this artist here?"):** Generated dynamically (e.g., *"EVAN grew +1456% from 5.3 to 83.0 listeners/mo, with 89% of fans also listening to BTS."*).
+- **6-Month Trend Line (U2):** Line chart showing monthly distinct listeners (March–August 2026). March–May zone shaded with subtle background color labeled *"Baseline"*; June–August shaded *"Recent"*.
+- **Fans Also Play (U3):** Horizontal bar chart showing up to 10 established co-listened acts, ranked by `share_of_fans` with percentage labels.
+- **Top Tracks (U4):** Table showing top recordings by recent listener traction, displaying recent listeners/mo, baseline listeners/mo, and direct clickable links to the song's MusicBrainz page.
+
+### 4.7 Persistent Shortlist Tray & CSV Export (U5)
+- **Client Persistence:** Stored in browser `localStorage` (`dso576_curator_tray`) so curator selections persist across browser refreshes.
+- **Card Content:** Artist Name, Growth %, and top taste-community match (*"Sounds like: [Top Artist]"*).
+- **Idempotency:** Adding the same artist multiple times is an automatic no-op.
+- **Export CSV:** Downloads `shortlist.csv` containing:
+  `artist_mbid, name, country, first_catalogued_date, baseline, recent, growth_percent, growth_ratio, sounds_like`
+- **Security:** Formula injection prevention enabled: cells starting with `=`, `+`, `-`, `@`, `\t`, `\r` are prefixed with `'` to prevent arbitrary spreadsheet code execution.
+
+---
+
+## 5. System Architecture & API Contract
+
+```
++-------------------------------------------------------------+
+| Browser Client (Vanilla JS ES Modules, Chart.js 4.4.1)      |
+| web/app.js  <-->  web/api.js  <-->  web/charts.js           |
++-------------------------------------------------------------+
+                              | JSON HTTP /api/...
++-------------------------------------------------------------+
+| FastAPI Application (api/app.py)                            |
+| Validates request schemas, handles errors & CORS            |
++-------------------------------------------------------------+
+                              | Python Calls
++-------------------------------------------------------------+
+| Analysis Engine (backend/analysis.py)                       |
+| Single source of truth; thread-safe DuckDB SQL on Parquet    |
++-------------------------------------------------------------+
+                              | Direct Query Execution
++-------------------------------------------------------------+
+| Canonical Parquet Tables (~/dso576_data/clean/)             |
+| artists_clean, artist_month_clean, user_artist_clean, ...   |
++-------------------------------------------------------------+
+```
+
+### 5.1 API Endpoints (`api/app.py`)
+- `GET /api/options`: Returns available genres, countries, and parameter defaults.
+- `GET /api/shortlist?min_release&min_baseline&size_pct&growth_pct&genre&country&preset`: Returns `{thresholds: {recent_cutoff, growth_cutoff, n_scored}, artists: [...]}`.
+- `GET /api/artist/{id}`: Returns profile metadata for a specific artist ID.
+- `GET /api/artist/{id}/trend`: Returns array of 6 monthly listener counts for Mar–Aug 2026.
+- `GET /api/artist/{id}/fans?n=10`: Returns top co-listened established acts (`share_of_fans`).
+- `GET /api/artist/{id}/tracks?n=5`: Returns top recordings with MusicBrainz URLs and listener averages.
+
+### 5.2 Deployment & Local Replication Architecture
+- **Local 1-Command Execution (Professor / TA):**
+  - **Python native:** `python run.py` (installs missing packages if needed, verifies tables, starts server, and automatically opens `http://localhost:8000`).
+  - **Node / npx:** `npm start` (wraps execution through `package.json`).
+- **Cloud Vercel Deployment:**
+  - Standard Vercel Serverless Function entry point (`api/index.py` wrapping the FastAPI app).
+  - Optimized Parquet / DuckDB dataset (<35MB) packaged within Vercel's serverless size limit (well under the 250MB limit) for instant <15ms response times.
+  - Zero browser-side heavy downloads: client only receives tiny JSON payloads per query.
+
+---
+
+## 6. Data Cleaning & Replication Pipeline
+
+To ensure the professor can verify data integrity and reproduce the cleaning process:
+- **Executable Script:** [`scripts/clean_data.py`](file:///Users/kunjeshgupta/Documents/USC MSBA/dso576/dso576_project/scripts/clean_data.py) executes all cleaning rules:
+  - **R1:** Bounding window to March 1 – August 31, 2026.
+  - **R2–R3:** Deduplication of exact scrobbles while preserving multi-recording timestamps.
+  - **R4–D5:** Exclusion of bot accounts (>500 scrobbles on any UTC day).
+  - **R5–R7:** Multi-artist credit handling and mapping merged MBIDs to surviving artists.
+  - **R8:** Removal of MusicBrainz special-purpose artists (e.g. *Various Artists*, *[unknown]*).
+  - **R11–R12:** Validation of release dates and strict non-imputation of missing metadata.
+- **Interactive Notebook:** [`notebooks/01_cleaning_replication.ipynb`](file:///Users/kunjeshgupta/Documents/USC MSBA/dso576/dso576_project/notebooks/01_cleaning_replication.ipynb) provides visual distributions, missingness analysis, and step-by-step audit tables.
+
+---
+
+## 7. Build Order
+
+1. **Backend Verification & Extensions (`backend/analysis.py`):**
+   - Ensure thread-safe DuckDB cursor allocation.
+   - Verify `thresholds()`, `shortlist()`, `artist_trend()`, `fans_also_play()`, and `top_tracks()`.
+   - Add "Unknown" country filtering support and preset categorization.
+2. **API Layer (`api/app.py`):**
+   - Implement the six REST endpoints with FastAPI and Pydantic validation.
+   - Mount static file serving for `web/`.
+3. **Web Client Core (`web/api.js` & `web/app.js`):**
+   - Implement `api.js` client functions with fetch error handling.
+   - Build filter bar, KPI strip, and paginated table in `app.js`.
+4. **Visualizations (`web/charts.js`):**
+   - Implement `renderScatter()` with log-x axis, cutoffs, and selection sync.
+   - Implement `renderTrend()` with baseline/recent shaded bands.
+   - Implement `renderFans()` with horizontal co-listening overlap bars.
+5. **Detail Panel & Presets Integration:**
+   - Connect artist selection to parallel detail fetches.
+   - Implement dynamic "Why is this artist here?" summary generator.
+   - Hook up preset buttons to auto-populate sliders and trigger queries.
+6. **Shortlist Tray & CSV Export:**
+   - Wire `localStorage` persistence, card rendering, and duplicate prevention.
+   - Implement secure CSV generator with formula escaping.
+7. **One-Command Runners & Vercel Configuration:**
+   - Create `run.py`, `package.json`, and `vercel.json`.
+
+---
+
+## 8. Acceptance Checks (Must Pass 100%)
+
+1. **Backend Self-Test:** `python backend/analysis.py` runs without errors, computes global quantiles, and verifies EVAN as #1 emerging artist.
+2. **API Verification:** `curl http://localhost:8000/api/shortlist` returns default emerging shortlist with cutoffs (`recent_cutoff` $\approx 87.3$, `growth_cutoff` $\approx 0.281$).
+3. **Ground Truth Validation:** Selecting **EVAN** (KR, +1456%) shows monthly listeners `[5, 6, 5, 89, 99, 61]`, and **BTS** is ranked #1 under "Fans also play" at **89%**.
+4. **Preset Functionality:** Clicking "Steady Climbers" eliminates zero-baseline artists; clicking "Fresh Debuts" surfaces acts debuting mid-window.
+5. **Filter Decoupling:** Changing Genre (e.g. to "hip hop") or Country filters the table rows without shifting the global cutoffs in the KPI strip.
+6. **Country Inclusivity (AUDIT-04):** Selecting "Unknown" in the Country dropdown displays artists lacking country metadata (e.g. Silk & Static).
+7. **Tray Persistence & Security:** Adding artists persists in `localStorage` across page refresh; exporting CSV generates all 9 columns with formula characters safely escaped.
+8. **Fault Tolerance:** If the backend is temporarily disconnected, the UI gracefully displays *"Couldn't load — retry"* on affected cards while keeping the page responsive.
+
+---
+
+## 9. Out of Scope
+
+- **Demographic listener data:** Age, gender, and listener location do not exist in MusicBrainz or ListenBrainz.
+- **Predictive hit forecasting:** The app surfaces empirical historical traction, not machine-learning hit predictions.
+- **User authentication or multi-user cloud accounts:** Shortlist state is maintained locally in `localStorage`.
+- **Modifying raw data:** Upstream source dumps are treated as immutable.
