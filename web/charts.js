@@ -56,6 +56,7 @@ export function generateSparklineSvg(data = [], width = 100, height = 28) {
 const artistScatterLabelsPlugin = {
   id: "artistScatterLabels",
   afterDatasetsDraw(chart) {
+    if (!chart || !chart.chartArea || !chart.ctx) return;
     const { ctx } = chart;
     const accent = getThemeAccent();
     ctx.save();
@@ -155,6 +156,7 @@ export function renderScatter(
     id: "quadrantShading",
     beforeDraw(chart) {
       const { ctx, chartArea, scales: { x, y } } = chart;
+      if (!chartArea || !x || !y) return;
       if (!th || !th.recent_cutoff || th.growth_cutoff == null) return;
 
       const cutoffX = x.getPixelForValue(th.recent_cutoff);
@@ -372,7 +374,6 @@ export function setChartZoom(chart, mode) {
   chart._zoomPreset = mode;
   chart.update();
 }
-}
 
 /**
  * Comparative 6-Month Trajectory Plot.
@@ -391,6 +392,7 @@ export function renderMultiTrend(canvas, rows = [], selectedId = null, onSelect 
     id: "trajectoryZones",
     beforeDraw(chart) {
       const { ctx, chartArea, scales: { x } } = chart;
+      if (!chartArea || !x) return;
       const mid = (x.getPixelForValue(2) + x.getPixelForValue(3)) / 2;
       ctx.save();
       ctx.fillStyle = "rgba(255, 255, 255, 0.02)";

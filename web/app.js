@@ -88,7 +88,7 @@ function switchStage(stageName) {
     if (state.rows.length === 0) {
       loadList();
     } else {
-      drawMainChart();
+      drawList();
     }
   } else {
     if (dashboard) {
@@ -304,6 +304,7 @@ function drawList() {
 }
 
 function drawMainChart() {
+  if (state.stage !== "dashboard") return;
   const canvas = $("scatter");
   if (!canvas) return;
 
@@ -473,7 +474,9 @@ function selectArtist(artistId) {
   if (!artistId) return;
   state.selectedId = artistId;
   highlightSelected(artistId);
-  loadSpotlight(artistId);
+  if (state.stage === "dashboard") {
+    loadSpotlight(artistId);
+  }
 
   // Update floating chart inspector
   const artist = state.rows.find((r) => r.artist_id === artistId);
@@ -690,7 +693,7 @@ document.addEventListener("click", (e) => {
   }
 
   // Enter Studio Button
-  if (t.closest("#btn-enter-studio")) {
+  if (t.closest("#btn-enter-studio") || t.closest(".btn-hero-primary")) {
     switchStage("dashboard");
     return;
   }
