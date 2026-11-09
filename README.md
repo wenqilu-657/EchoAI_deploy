@@ -1,160 +1,127 @@
-# EchoAI — Emerging Artist Discovery Dashboard (USC MSBA DSO 576)
+# EchoAI: Emerging Artist Discovery (USC MSBA DSO 576)
 
-[![Tests](https://img.shields.io/badge/tests-11%20passed-10b981?style=flat-square)](file:///Users/kunjeshgupta/Documents/USC%20MSBA/dso576/dso576_project/tests/test_analysis_and_api.py)
-[![Data Cleaning](https://img.shields.io/badge/cleaning%20audit-verified-10b981?style=flat-square)](file:///Users/kunjeshgupta/Documents/USC%20MSBA/dso576/dso576_project/output/cleaning_replication_report.json)
-[![UI Design](https://img.shields.io/badge/design-swiss%20minimalist-0b0d10?style=flat-square)](file:///Users/kunjeshgupta/Documents/USC%20MSBA/dso576/dso576_project/web/styles.css)
+**Live demo: https://echo-ai-deploy.vercel.app/**
 
-An intelligence suite designed for editorial playlist curators at streaming platforms (Spotify, Apple Music) and independent tastemakers. Built on **MusicBrainz metadata** and **ListenBrainz scrobbles (March–August 2026)** to identify breakout talent before mainstream algorithmic saturation.
+EchoAI helps an editorial playlist curator (at a streaming service or an independent playlist) find small artists whose audience is growing fast, before they reach the mainstream. It is built on MusicBrainz artist metadata and ListenBrainz listening data from March to August 2026.
 
----
+> **Read this first: the live demo runs on a 58-artist test fixture (56 KB), not the full data.** The full cleaned dataset covers 610,423 artists and yields 1,131 emerging artists at the default settings. The demo yields 6. The demo shows how the product works; its 6 artists are not research findings. See [Data scope](#data-scope) and [Limitations](#limitations).
 
-## ⚡ 1-Command Local Startup
+## User scenario
 
-Clone the repository and run:
+**Who:** a playlist curator who builds a weekly "rising artists" playlist and has no demographic or streaming-platform data, only public listening behaviour.
+
+**Decision:** which small, fast-growing artists are worth a closer listen and a place on a shortlist this week?
+
+**Walkthrough (about 2 minutes):**
+
+1. **Discovery Hub.** Read the catalog size and observation window, then click *Enter Discovery Studio*.
+2. **Studio.** The default view lists the artists that pass every gate: first release 2023 or later, at least 5 baseline listeners, audience below the 90th percentile, growth above the 90th percentile.
+3. **Tune the definition.** Four sliders (release year, growth percentile, size percentile, minimum baseline listeners) re-run the shortlist instantly. The heading and the sentence under it show the exact cutoffs in use.
+4. **Filter.** Search by name, and filter by category, genre, market and audience size. Sort by growth, listeners, smallest audience or name. Reset clears everything.
+5. **Inspect.** Click an artist (card, table row or chart point) to see the editorial summary, the 6-month trajectory, the "fans also listen to" taste community and a lead track.
+6. **Shortlist and export.** Add artists to the shortlist tray and export it as CSV.
+
+## What counts as "emerging"
+
+An artist is emerging when all four gates pass. All four thresholds are sliders in the dashboard.
+
+| Gate | Default | Why |
+|---|---|---|
+| First release date | 2023-01-01 or later | Without it, long-established acts dominate the growth ranking |
+| Baseline audience | at least 5 average monthly listeners, Mar to May | Below 5 listeners, a growth percentage is mostly noise |
+| Size ceiling | recent monthly listeners at or below the 90th percentile | Keeps stars out |
+| Growth | growth at or above the 90th percentile | "Small but growing" |
+
+`baseline` is the average monthly distinct listeners for March to May. `recent` is the same average for June to August. `growth = (recent - baseline) / baseline`. Percentiles are computed over artists with a baseline of at least 5.
+
+| | Full data | Demo (58 artists) |
+|---|---|---|
+| Artists scored | 610,423 | 58 |
+| Emerging at defaults | 1,131 | 6 |
+| 90th percentile recent listeners | 87.3 per month | 298.0 per month |
+| 90th percentile growth | +28.1% | +407% |
+
+## Reading the numbers
+
+- **"Mar '26" and "Aug '26" on each card are period averages**, not single months: the baseline average (Mar to May) and the recent average (Jun to Aug). The monthly trajectory chart shows the real month-by-month values.
+- **6M Growth** is the growth formula above. A large percentage from a tiny base (for example +1456% from 5.3 listeners) means a few listeners, not a large audience. Read it together with the listener counts.
+- **Fans also listen to** is the taste community: for the selected artist, the established artists ranked by the share of that artist's listeners who also listen to them. It is behavioural overlap and uses no demographic data.
+- **Categories:** *Emerging Acts* pass all four gates. *Mainstream Benchmarks* are artists whose recent audience is above the size ceiling. *Developing Candidates* are everything else: in the catalog but failing at least one gate.
+- **Taste-community benchmarks** are artists with more than about 87 average monthly listeners in the full data. That cutoff is fixed at the full-data value, so it does not move with the sliders.
+- **Audience scale:** Micro (under 50 listeners per month), Rising (50 to 300), Mainstream (over 300).
+- **Percentile cutoffs move with the baseline slider.** Raising the minimum baseline shrinks the population the percentiles are computed on, so the cutoff for "90th percentile growth" changes too. The sentence under the heading always shows the cutoff in use.
+
+## Controls and difficult cases
+
+| Situation | What happens |
+|---|---|
+| Sliders set so nothing qualifies, or a search matches nothing | A message says no artists matched and suggests loosening the sliders, clearing the search or clicking Reset |
+| Artist with missing genre, country or release date | Shown as `Unknown`, never guessed or filled in |
+| Artist with fewer than 5 baseline listeners | Not given a growth figure, so it cannot enter the growth ranking |
+| Many results | Results are paged; switch between cards and a data table |
+| Shortlist is empty | The export button stays disabled until an artist is added |
+| Filters get confusing | *Reset* clears the search and the filters |
+
+## Data scope
+
+| Item | Value |
+|---|---|
+| Listening data | ListenBrainz Spark full dump 2722 (2026-10-15), all users, listens from 2026-03-01 up to 2026-09-01 |
+| Artist metadata | MusicBrainz full export 20260930-002222 (CC0) |
+| Listens in the window | 249,645,377, then 244,794,323 after removing exact duplicates, then 232,640,849 credited to an artist |
+| Artists in the cleaned data | 610,423 |
+| Artist identity | MusicBrainz artist ID. Merged IDs are redirected. Names are display only |
+| Bots | Users with more than 500 listens on any UTC day are excluded (1,692 of 58,378 users, 39.2% of listens). A 1,000-listens threshold is reported as a sensitivity check (28.4%) |
+| Excluded | Listens with no artist ID (37.3M, 15%), and special-purpose artists such as Various Artists and [unknown] |
+| Not imputed | Genre, country and release date are left missing when missing |
+
+Every cleaning and metric decision is recorded in [DATA_DECISIONS.md](DATA_DECISIONS.md) (D1 to D10), with the glossary in [GLOSSARY.md](GLOSSARY.md) and the scoring rationale in [docs/adr](docs/adr).
+
+The tables in `data/clean/` are the 58-artist fixture (a few KB each), so the repository clones instantly. The full cleaned tables (about 1.5 GB) are not in this repository. To rebuild them, follow `extraction/README.md` (about 3 hours). Row counts and SHA-256 prefixes to check a rebuild against are in DATA_DECISIONS.md, section 5.
+
+## Limitations
+
+- **The live demo is a 58-artist test fixture.** Its 6 emerging artists show the product working, not real findings. Findings come from the full data (1,131 emerging artists).
+- **Audience bias.** ListenBrainz users are self-selected music enthusiasts, not a streaming platform's audience. "Growth" means traction inside this community.
+- **No demographics.** No listener age, gender, location or playlist data exists in any source, so the dashboard cannot say who the listeners are. Taste communities are co-listening overlap only.
+- **Sparse metadata.** In the full data, 20% of artists have a genre, 63% a country and 75% a first release date. Only 18% of the default shortlist has a genre, so "All genres" is the default and the genre filter is a weak signal.
+- **New-artist blind spot.** An artist needs at least 5 baseline listeners to get a growth figure. In the full data, 355 artists that debuted in March 2026 or later and have at least 5 recent listeners are left out of the growth ranking because they have no baseline.
+- **Percentage growth from tiny numbers is unstable.** The 5-listener floor reduces this but does not remove it.
+- **Rule-based bot filter.** The 500-listens-per-day cutoff is a judgement call; a different cutoff changes the shortlist (see the sensitivity check above).
+- **Tracks.** Lead tracks come from a table that removes bots but not exact duplicates (about 2% of listens), and credits only the first listed artist on each recording.
+- **Six-month window.** March to August 2026 is enough for a trend, not for seasonality.
+
+## Run it locally
 
 ```bash
-# Option A: Native Python (recommended)
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python run.py
-
-# Option B: Node / npm
-npm start
+python run.py          # or: npm start
 ```
 
-The application will automatically initialize the DuckDB in-memory analytical engine and open `http://localhost:8000` in your default browser.
+The app opens at http://localhost:8000. `run.py` loads the data through `backend/analysis.py`.
 
----
-
-## 🎯 What is an "Emerging Artist"?
-
-Traditional discovery relies solely on raw stream counts, which biases toward established viral hits. EchoAI identifies emerging acts using a rigorous, multi-factor analytical gate:
-
-1. **Size Ceiling ($p_{90}$ Percentile):** Monthly listeners must remain below the 90th percentile of scored acts ($\le 87.3$ listeners/month canonical; $\le 298.0$ in sample), filtering out established stars.
-2. **Growth Velocity ($p_{90}$ Percentile):** Audience growth between the baseline window (Mar–May 2026) and recent window (Jun–Aug 2026) must exceed the 90th percentile ($\ge +28.1\%$ canonical; $\ge +407.1\%$ in sample).
-3. **Activity Floor:** Minimum $\ge 5$ average monthly listeners during the baseline window, with verified active listening in at least 2 distinct baseline months (eliminating "one-month flash" anomalies).
-
-### Key Advanced Telemetry & Analytics:
-* **Stickiness Ratio (`listens / listeners`):** Measures repeat listening depth. High stickiness ($>3.0\times$) indicates fan loyalty rather than passive autoplay.
-* **Audience Retention (`avg_months_active / 6`):** How consistently scrobblers return across the 6-month observation window.
-* **Catalog Depth / Track Dependency (`top_track / total`):** Identifies whether growth is concentrated in a single viral track ($>65\%$) or spread across an artist's full discography (deep catalog).
-* **Taste Community Overlap (`share_of_fans`):** Solves cold-start sparse genre tags by calculating co-listening overlap with established benchmark acts (e.g. *BTS, Radiohead, Taylor Swift*).
-
----
-
-## 🛠️ Reproducibility & Auditing
-
-The grading instructor can verify the entire data cleaning and analytical engine with zero external setup:
+Checks:
 
 ```bash
-# 1. Run the canonical data cleaning replication audit (Rules R1-R12)
-python scripts/clean_data.py
-
-# 2. Run the feature & threshold audit checks
-python audit/kunjesh_audit_checks.py
-
-# 3. Run the automated unit & integration test suite (11 tests)
-python -m unittest discover tests
+python scripts/clean_data.py               # replication audit of the cleaning rules
+python audit/kunjesh_audit_checks.py       # feature and threshold checks
+python -m unittest discover tests          # unit and integration tests
+python backend/analysis.py                 # self-check on the loaded data
 ```
 
----
+## Deployment
 
-## ☁️ Deploy to Vercel
+Deployed on Vercel at https://echo-ai-deploy.vercel.app/ using `vercel.json` and `api/index.py` (FastAPI backend, static front end in `web/`).
 
-The project includes serverless Python handlers (`api/index.py` and `vercel.json`) ready for one-click deployment:
+## Repository map
 
-```bash
-# Deploy with Vercel CLI
-npx vercel
-```
-
----
-
-# Module 3 Project Starter
-
-Use this repository to investigate two candidate project Visions, combine the
-team's evidence, and record a provisional starting point. The files are
-scaffolds: replace the bracketed prompts with your team's own checked work.
-
-## Start here
-
-1. Choose one project area as a team.
-2. Write two distinct candidate Vision statements in `project-start.md`.
-3. Copy the same area and candidate statements to the top of every assigned
-   role file.
-4. Assign one role file to each teammate:
-
-   - `objectives.md`
-   - `alternatives.md`
-   - `data-fit.md`
-   - `auxiliary.md`
-   - `technical.md`
-   - `objections.md` - only for teams of six
-
-5. Each teammate investigates both candidate Visions in their assigned file.
-6. Reconvene and synthesize the team's evidence in `project-start.md`.
-7. Put every teammate's GitHub username on its own line in `members.md`.
-
-Do not force a final project choice in Module 3. Preserve the real questions
-that the team still needs to answer.
-
-## Required files
-
-| File | Owner | Main question |
-|---|---|---|
-| `members.md` | coordinator | Who needs access to the private team repository? |
-| `project-start.md` | coordinator, reviewed by everyone | What provisional starting point did the team establish? |
-| `objectives.md` | Role 1 | What matters when this person makes the decision? |
-| `alternatives.md` | Role 2 | How might the person make the decision today? |
-| `data-fit.md` | Role 3 | What can the core data honestly support? |
-| `auxiliary.md` | Role 4 | What decision-important input is missing? |
-| `technical.md` | Role 5 | Can the team access and work with a promising source? |
-| `objections.md` | Role 6, teams of six only | What could block trust, adoption, or action? |
-
-## Evidence rules
-
-- Separate sourced facts from AI-generated hypotheses.
-- Link original sources for factual claims.
-- Record what you checked and what remains uncertain.
-- Do not claim the actual organization follows a process unless you verified it.
-- Do not claim the data supports something that was not observed.
-- Do not commit downloaded data, credentials, `.env` files, or private data.
-
-## Safe Git contribution sequence
-
-1. Pull the latest team work before beginning.
-2. Edit only your assigned Markdown file.
-3. Review `git status` and your file diff.
-4. Commit with a clear message.
-5. Pull again if a teammate may have pushed.
-6. Resolve any conflict deliberately, then push one person at a time.
-
-The coordinator commits `project-start.md` once. Other teammates should review
-and contribute to its wording without creating competing copies.
-
-## Pandas quiz tutor
-
-Open a coding-agent session in this repository and say:
-
-> Read `tutor.md` and tutor me for the Module 3 Pandas quiz.
-
-The tutor generates difficult, one-at-a-time tracing questions covering the
-Module 1–3 Pandas vocabulary, including `.loc`, `.iloc`, filtering, sorting,
-cleaning, summaries, typed functions, and `.map()`. It deliberately excludes
-`groupby` and later-course shortcuts.
-
-## Module 6 - Project data cleaning (Navya Gupta)
-
-- **Branch:** `navya` | **Branch URL:** https://github.com/kunjeshgupta/dso576_project/tree/navya | **Commit ID:** 0b6827ab82aab47d301e103b44dc46d93bc6f525
-- **Data source and version:** MusicBrainz core database dump `20260930-002222` (CC0), `mbdump.tar.bz2` from https://data.metabrainz.org/pub/musicbrainz/data/fullexport/20260930-002222/ . Downloaded 2026-10-03. Tables used: `artist` (2,999,670 rows), `artist_type`, `gender`, `area`. The raw dump is not committed (see `.gitignore`) and is never modified.
-- **Plan and decisions:** `plan.md` (rules, reasons, expected record-check results written before the code ran). **Results:** `output/cleaning_log.md`.
-- **Run instructions** (from the repo root; needs about 4 GB of free RAM and ~8 GB of disk during extraction):
-  ```
-  python3 -m venv .venv && source .venv/bin/activate
-  pip install -r requirements.txt
-  bash scripts/extract_musicbrainz.sh      # streams the dump, keeps 4 tables in data/raw/mb/ (10-30 min)
-  python scripts/clean_artists.py          # ~3 min; exits non-zero if any check fails
-  ```
-- **Expected output files:** `data/clean/artist_clean.csv.gz` (full cleaned table, not committed), `output/sample_50_rows.json` (50 rows chosen by rule), `output/cleaning_log.md` (counts, before/after missing values, record checks). Expected: 2,999,670 rows before and after; all five record checks PASS.
-- **Dependencies:** `requirements.txt` (pandas, numpy). Python 3.9+.
-- `scripts/fetch_listens.py` is an unused first attempt at the ListenBrainz API sample (the API was unavailable on 2026-10-03); it needs `requests` and is not part of the cleaning run.
+| Path | Contents |
+|---|---|
+| `web/` | Front end (plain HTML, CSS and JavaScript) |
+| `api/`, `backend/` | FastAPI app and DuckDB analysis (`backend/analysis.py`) |
+| `data/clean/` | The 58-artist fixture tables the app and the live demo read |
+| `extraction/`, `scripts/` | Scripts that build and clean the data |
+| `audit/`, `tests/` | Audit checks and tests |
+| `DATA_DECISIONS.md`, `GLOSSARY.md`, `BUILD_SPEC.md`, `docs/adr/` | Decisions, terms, build specification, scoring rationale |
+| `docs/` | Course history: the Module 3 starter instructions and the Module 6 cleaning submission |
